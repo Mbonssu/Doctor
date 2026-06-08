@@ -1,0 +1,190 @@
+/// API Configuration for different environments
+/// 
+/// This class manages API base URLs, timeouts, and environment-specific
+/// configurations for the DoctoPing mobile application.
+library;
+
+import 'package:flutter/foundation.dart';
+
+enum Environment {
+  development,
+  staging,
+  production,
+}
+
+class ApiConfig {
+  // Private constructor to prevent instantiation
+  ApiConfig._();
+
+  // Current environment - can be set at app startup
+  static Environment _currentEnvironment = Environment.development;
+
+  // Environment detection and configuration
+  static Environment get currentEnvironment => _currentEnvironment;
+
+  static void setEnvironment(Environment environment) {
+    _currentEnvironment = environment;
+  }
+
+  // Base URLs for different environments
+  static const String _developmentBaseUrl = 'http://192.168.137.165:8000';
+  static const String _stagingBaseUrl = 'https://staging-api.doctoping.com';
+  static const String _productionBaseUrl = 'https://api.doctoping.com';
+  
+  // Custom development URL (for connecting from mobile to desktop backend)
+  static String? _customDevelopmentUrl;
+
+  /// Set a custom development URL (useful for testing on physical devices)
+  /// Example: ApiConfig.setCustomDevelopmentUrl('http://192.168.1.100:8000')
+  static void setCustomDevelopmentUrl(String url) {
+    _customDevelopmentUrl = url;
+  }
+
+  /// Get the base URL for the current environment
+  static String get baseUrl {
+    switch (_currentEnvironment) {
+      case Environment.development:
+        // Use custom URL if set (for mobile testing on physical devices)
+        return _customDevelopmentUrl ?? _developmentBaseUrl;
+      case Environment.staging:
+        return _stagingBaseUrl;
+      case Environment.production:
+        return _productionBaseUrl;
+    }
+  }
+
+  /// API version prefix
+  static const String apiVersion = '/api/v1';
+
+  /// Full API base URL with version
+  static String get apiBaseUrl => '$baseUrl$apiVersion';
+
+  // Timeout configurations (in seconds)
+  
+  /// Connection timeout - time to establish connection
+  static const Duration connectionTimeout = Duration(seconds: 10);
+
+  /// Read timeout - time to receive response after connection
+  static const Duration readTimeout = Duration(seconds: 30);
+
+  /// Write timeout - time to send request data
+  static const Duration writeTimeout = Duration(seconds: 30);
+
+  // API Endpoints
+  
+  /// Authentication endpoints
+  static const String loginEndpoint = '/auth/login';
+  static const String registerEndpoint = '/auth/register';
+  static const String refreshEndpoint = '/auth/refresh';
+  static const String logoutEndpoint = '/auth/logout';
+
+  /// User endpoints
+  static const String userProfileEndpoint = '/users/me';
+
+  /// Doctor endpoints
+  static const String doctorsEndpoint = '/doctors';
+  static const String topRatedDoctorsEndpoint = '/doctors/top-rated';
+  static String doctorByIdEndpoint(int doctorId) => '/doctors/$doctorId';
+  static String doctorsBySpecialtyEndpoint(String specialty) =>
+      '/doctors/specialty/$specialty';
+
+  /// Appointment endpoints
+  static const String appointmentsEndpoint = '/appointments';
+  static const String myAppointmentsEndpoint = '/appointments/my-appointments';
+  static const String upcomingAppointmentsEndpoint = '/appointments/upcoming';
+  static const String checkAvailabilityEndpoint =
+      '/appointments/check-availability';
+  static String appointmentByIdEndpoint(int appointmentId) =>
+      '/appointments/$appointmentId';
+  static String cancelAppointmentEndpoint(int appointmentId) =>
+      '/appointments/$appointmentId/cancel';
+
+  /// Review endpoints
+  static const String reviewsEndpoint = '/reviews';
+  static String doctorReviewsEndpoint(int doctorId) =>
+      '/reviews/doctor/$doctorId';
+
+  /// Favorite endpoints
+  static const String favoritesEndpoint = '/favorite-doctors';
+
+  // Common headers
+  static const Map<String, String> defaultHeaders = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  };
+
+  // Pagination defaults
+  static const int defaultPageSize = 20;
+  static const int defaultPage = 1;
+
+  // Search debounce duration
+  static const Duration searchDebounceDelay = Duration(milliseconds: 300);
+
+  // Cache expiration times
+  static const Duration doctorsCacheExpiration = Duration(minutes: 5);
+  static const Duration userProfileCacheExpiration = Duration(minutes: 10);
+  static const Duration appointmentsCacheExpiration = Duration(minutes: 2);
+
+  // Retry configuration
+  static const int maxRetries = 3;
+  static const Duration initialRetryDelay = Duration(seconds: 1);
+
+  /// Check if the current environment is development
+  static bool get isDevelopment => _currentEnvironment == Environment.development;
+
+  /// Check if the current environment is staging
+  static bool get isStaging => _currentEnvironment == Environment.staging;
+
+  /// Check if the current environment is production
+  static bool get isProduction => _currentEnvironment == Environment.production;
+
+  /// Enable detailed logging in development
+  static bool get enableLogging => isDevelopment;
+
+  /// Get environment name as string
+  static String get environmentName {
+    switch (_currentEnvironment) {
+      case Environment.development:
+        return 'Development';
+      case Environment.staging:
+        return 'Staging';
+      case Environment.production:
+        return 'Production';
+    }
+  }
+
+  /// Load environment from string (useful for configuration files)
+  static void loadEnvironmentFromString(String envString) {
+    switch (envString.toLowerCase()) {
+      case 'development':
+      case 'dev':
+        _currentEnvironment = Environment.development;
+        break;
+      case 'staging':
+      case 'stage':
+        _currentEnvironment = Environment.staging;
+        break;
+      case 'production':
+      case 'prod':
+        _currentEnvironment = Environment.production;
+        break;
+      default:
+        // Default to development if unknown
+        _currentEnvironment = Environment.development;
+    }
+  }
+
+  /// Print current configuration (for debugging)
+  static void printConfig() {
+    if (!enableLogging) return;
+
+    debugPrint('=== API Configuration ===');
+    debugPrint('Environment: $environmentName');
+    debugPrint('Base URL: $baseUrl');
+    debugPrint('API Base URL: $apiBaseUrl');
+    debugPrint('Connection Timeout: ${connectionTimeout.inSeconds}s');
+    debugPrint('Read Timeout: ${readTimeout.inSeconds}s');
+    debugPrint('Logging Enabled: $enableLogging');
+    debugPrint('========================');
+  }
+}

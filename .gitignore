@@ -1,0 +1,56 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+*.lock
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.pyc
+.symlinks/
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Android
+*.iml
+*.ipr
+*.iws
+.idea/
+gradle/
+local.properties
+*.keystore
+*.jks
+android/app/build
+android/.gradle
+
+# iOS
+Pods/
+Podfile.lock
+*.xcworkspace
+*.xcuserstate
+
+# macOS
+.DS_Store
+
+# Web
+.dccache/
+
+# VS Code
+.vscode/
+
+# Archives
+*.tar
+*.xz
+*.zip
+*.gz
+
+# APK files
+*.apk
+
+# Cache files
+*.dill
+*.track.dill

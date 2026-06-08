@@ -1,0 +1,171 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'app_colors.dart';
+
+class AppTheme {
+  static ThemeData get lightTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primary,
+        brightness: Brightness.light,
+        primary: AppColors.primary,
+        onPrimary: AppColors.white,
+        secondary: AppColors.accent,
+        onSecondary: AppColors.white,
+        surface: AppColors.surface,
+        onSurface: AppColors.textPrimary,
+        error: AppColors.danger,
+        onError: AppColors.white,
+      ),
+      fontFamily: 'SF Pro Display',
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1.0, color: AppColors.textPrimary),
+        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: AppColors.textPrimary),
+        displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.6, color: AppColors.textPrimary),
+        headlineLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: AppColors.textPrimary),
+        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: AppColors.textPrimary),
+        headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColors.textPrimary),
+        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+        titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+        bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textPrimary),
+        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondary),
+        bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMuted),
+        labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+        labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+        labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+      ),
+      appBarTheme: const AppBarTheme(
+        elevation: 0, scrolledUnderElevation: 0,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary, letterSpacing: -0.3),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        margin: EdgeInsets.zero,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: AppColors.primary,
+          foregroundColor: AppColors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          elevation: 0,
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.border, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.surfaceVariant,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.border, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.danger, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14, fontWeight: FontWeight.w400),
+        labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1, space: 1),
+      scaffoldBackgroundColor: AppColors.background,
+    );
+  }
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: AppColors.primaryDark,
+        brightness: Brightness.dark,
+        primary: AppColors.primaryDark,
+        onPrimary: AppColors.white,
+        secondary: AppColors.successDark,
+        onSecondary: AppColors.white,
+        surface: AppColors.surfaceDark,
+        onSurface: AppColors.textPrimaryDark,
+        error: AppColors.dangerDark,
+        onError: AppColors.white,
+      ),
+      fontFamily: 'SF Pro Display',
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -1.0, color: AppColors.textPrimaryDark),
+        displayMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.8, color: AppColors.textPrimaryDark),
+        displaySmall: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.6, color: AppColors.textPrimaryDark),
+        headlineLarge: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.4, color: AppColors.textPrimaryDark),
+        headlineMedium: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, letterSpacing: -0.3, color: AppColors.textPrimaryDark),
+        headlineSmall: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: -0.2, color: AppColors.textPrimaryDark),
+        titleLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimaryDark),
+        titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimaryDark),
+        titleSmall: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textSecondaryDark),
+        bodyLarge: TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: AppColors.textPrimaryDark),
+        bodyMedium: TextStyle(fontSize: 14, fontWeight: FontWeight.w400, color: AppColors.textSecondaryDark),
+        bodySmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: AppColors.textMutedDark),
+        labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryDark),
+        labelMedium: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondaryDark),
+        labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMutedDark),
+      ),
+      appBarTheme: const AppBarTheme(
+        elevation: 0, scrolledUnderElevation: 0,
+        backgroundColor: AppColors.backgroundDark,
+        foregroundColor: AppColors.textPrimaryDark,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
+        titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimaryDark, letterSpacing: -0.3),
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        margin: EdgeInsets.zero,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: AppColors.primaryDark,
+          foregroundColor: AppColors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          elevation: 0,
+          foregroundColor: AppColors.textPrimaryDark,
+          side: const BorderSide(color: AppColors.borderDark, width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.cardBgDark,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.borderDark, width: 1.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.borderDark, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.primaryDark, width: 2)),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.dangerDark, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        hintStyle: const TextStyle(color: AppColors.textMutedDark, fontSize: 14, fontWeight: FontWeight.w400),
+        labelStyle: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14, fontWeight: FontWeight.w500),
+      ),
+      dividerTheme: const DividerThemeData(color: AppColors.borderDark, thickness: 1, space: 1),
+      scaffoldBackgroundColor: AppColors.backgroundDark,
+    );
+  }
+}
