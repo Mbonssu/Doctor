@@ -197,4 +197,40 @@ class NavigationHelper {
   static Future<void> goToChat(BuildContext context, {required String doctorName, required String doctorId}) {
     return navigateTo(context, AppRoutes.chat, arguments: {'doctorName': doctorName, 'doctorId': doctorId});
   }
+
+  // Splash & onboarding
+  static Future<void> goToSplash(BuildContext context) {
+    return navigateAndRemoveUntil(context, AppRoutes.splash);
+  }
+
+  static Future<void> goToOnboarding(BuildContext context) {
+    return navigateAndRemoveUntil(context, AppRoutes.onboarding);
+  }
+
+  // Doctor role (interface médecin)
+  static Future<void> goToDoctorMain(BuildContext context, {bool clearStack = false}) {
+    if (clearStack) return navigateAndRemoveUntil(context, AppRoutes.doctorMain);
+    return navigateTo(context, AppRoutes.doctorMain);
+  }
+
+  static Future<void> goToDoctorDashboard(BuildContext context) {
+    return navigateTo(context, AppRoutes.doctorDashboard);
+  }
+
+  static Future<void> goToDoctorProfile(BuildContext context) {
+    return navigateTo(context, AppRoutes.doctorProfile);
+  }
+
+  static Future<void> goToDoctorSchedule(BuildContext context) {
+    return navigateTo(context, AppRoutes.doctorSchedule);
+  }
+
+  static Future<void> goToDoctorAppointments(BuildContext context) {
+    return navigateTo(context, AppRoutes.doctorAppointments);
+  }
+
+  // Debug
+  static Future<void> goToConnectionTest(BuildContext context) {
+    return navigateTo(context, AppRoutes.connectionTest);
+  }
 }

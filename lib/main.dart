@@ -8,8 +8,8 @@ import 'core/theme/app_colors.dart';
 import 'core/providers/theme_provider.dart';
 import 'core/routes/app_routes.dart';
 import 'core/providers/auth_session_manager.dart';
-import 'presentation/screens/onboarding/onboarding_screen.dart';
-import 'presentation/screens/home/main_navigation.dart';
+import 'presentation/authenticated_content.dart';
+import 'presentation/screens/splash/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,9 +53,11 @@ class DoctoPingApp extends StatelessWidget {
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
-            home: authSession.isAuthenticated
-                ? const MainNavigation()
-                : const OnboardingScreen(),
+            home: authSession.isInitialized
+                ? (authSession.isAuthenticated
+                    ? const AuthenticatedContent()
+                    : const SplashScreen())
+                : const SplashScreen(),
             onGenerateRoute: AppRoutes.generateRoute,
           );
         },

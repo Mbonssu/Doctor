@@ -13,11 +13,28 @@ import '../../presentation/screens/auth/email_verification_screen.dart';
 import '../../presentation/screens/home/main_navigation.dart';
 import '../../presentation/screens/home/home_screen.dart';
 
+// Splash & onboarding
+import '../../presentation/screens/splash/splash_screen.dart';
+import '../../presentation/screens/onboarding/onboarding_screen.dart';
+
+// Authenticated content (routing par rôle)
+import '../../presentation/authenticated_content.dart';
+
+// Connection test (debug)
+import '../../presentation/pages/connection_test_page.dart';
+
 // Doctors
 import '../../presentation/screens/doctors/doctors_screen.dart';
 import '../../presentation/screens/doctors/doctor_detail_screen.dart';
 import '../../presentation/screens/doctors/doctor_reviews_screen.dart';
 import '../../presentation/screens/doctors/favorite_doctors_screen.dart';
+
+// Doctor role (interface médecin)
+import '../../presentation/screens/doctor/doctor_main_navigation.dart';
+import '../../presentation/screens/doctor/doctor_dashboard_screen.dart';
+import '../../presentation/screens/doctor/doctor_profile_screen.dart';
+import '../../presentation/screens/doctor/doctor_schedule_screen.dart';
+import '../../presentation/screens/doctor/doctor_appointments_screen.dart';
 
 // Appointments
 import '../../presentation/screens/appointments/appointments_screen.dart';
@@ -82,15 +99,30 @@ class AppRoutes {
   static const String resetPassword = '/reset-password';
   static const String emailVerification = '/email-verification';
 
+  // Splash & onboarding
+  static const String splash = '/splash';
+  static const String onboarding = '/onboarding';
+  static const String authenticatedContent = '/authenticated';
+
+  // Debug
+  static const String connectionTest = '/connection-test';
+
   // Main routes
   static const String main = '/main';
   static const String home = '/home';
 
-  // Doctors routes
+  // Doctors routes (patient)
   static const String doctors = '/doctors';
   static const String doctorDetail = '/doctor-detail';
   static const String doctorReviews = '/doctor-reviews';
   static const String favoriteDoctors = '/favorite-doctors';
+
+  // Doctor role routes (interface médecin)
+  static const String doctorMain = '/doctor-main';
+  static const String doctorDashboard = '/doctor-dashboard';
+  static const String doctorProfile = '/doctor-profile';
+  static const String doctorSchedule = '/doctor-schedule';
+  static const String doctorAppointments = '/doctor-appointments';
 
   // Appointments routes
   static const String appointments = '/appointments';
@@ -148,6 +180,30 @@ class AppRoutes {
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
+      // Splash & onboarding
+      case splash:
+        return MaterialPageRoute(builder: (_) => const SplashScreen());
+      case onboarding:
+        return MaterialPageRoute(builder: (_) => const OnboardingScreen());
+      case authenticatedContent:
+        return MaterialPageRoute(builder: (_) => const AuthenticatedContent());
+
+      // Debug
+      case connectionTest:
+        return MaterialPageRoute(builder: (_) => const ConnectionTestPage());
+
+      // Doctor role routes (interface médecin)
+      case doctorMain:
+        return MaterialPageRoute(builder: (_) => const DoctorMainNavigation());
+      case doctorDashboard:
+        return MaterialPageRoute(builder: (_) => const DoctorDashboardScreen());
+      case doctorProfile:
+        return MaterialPageRoute(builder: (_) => const DoctorProfileScreen());
+      case doctorSchedule:
+        return MaterialPageRoute(builder: (_) => const DoctorScheduleScreen());
+      case doctorAppointments:
+        return MaterialPageRoute(builder: (_) => const DoctorAppointmentsScreen());
+
       // Auth routes
       case welcome:
         return MaterialPageRoute(builder: (_) => const WelcomeScreen());
