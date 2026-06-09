@@ -2,8 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme/color_extensions.dart';
 
-/// Widget pour créer des cards avec effet glassmorphism en mode sombre
-/// En mode clair, affiche une card normale
+/// Card avec effet glassmorphism en dark mode, card normale en light mode.
 class GlassCard extends StatelessWidget {
   final Widget child;
   final double? width;
@@ -34,7 +33,8 @@ class GlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveBorderRadius = borderRadius ?? BorderRadius.circular(16);
+    final effectiveRadius = borderRadius ?? BorderRadius.circular(16);
+    final isDark = context.isDark;
 
     Widget content = Container(
       width: width,
@@ -42,7 +42,7 @@ class GlassCard extends StatelessWidget {
       margin: margin,
       child: isDark
           ? ClipRRect(
-              borderRadius: effectiveBorderRadius,
+              borderRadius: effectiveRadius,
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
@@ -50,7 +50,7 @@ class GlassCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: color ?? Colors.white.withValues(alpha: 0.05),
                     gradient: gradient,
-                    borderRadius: effectiveBorderRadius,
+                    borderRadius: effectiveRadius,
                     border: border ??
                         Border.all(
                           color: Colors.white.withValues(alpha: 0.1),
@@ -74,12 +74,9 @@ class GlassCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: color ?? context.surfaceColor,
                 gradient: gradient,
-                borderRadius: effectiveBorderRadius,
+                borderRadius: effectiveRadius,
                 border: border ??
-                    Border.all(
-                      color: context.borderColor,
-                      width: 1,
-                    ),
+                    Border.all(color: context.borderColor, width: 1),
                 boxShadow: boxShadow,
               ),
               child: child,
@@ -87,17 +84,13 @@ class GlassCard extends StatelessWidget {
     );
 
     if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        child: content,
-      );
+      return GestureDetector(onTap: onTap, child: content);
     }
-
     return content;
   }
 }
 
-/// Widget pour créer des stat cards avec effet glassmorphism en mode sombre
+/// Stat card glass pour le home screen.
 class GlassStatCard extends StatelessWidget {
   final String value;
   final String label;
@@ -116,7 +109,6 @@ class GlassStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
     return Expanded(
       child: GlassCard(
         padding: const EdgeInsets.all(14),
@@ -149,7 +141,7 @@ class GlassStatCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w500,
-                color: context.textMuted,
+                color: context.mutedText,
               ),
             ),
           ],

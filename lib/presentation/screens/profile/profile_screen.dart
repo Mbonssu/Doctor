@@ -286,14 +286,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 14),
                   // Mode sombre
                   _SettingTile(
-                    icon: isDark
+                    icon: context.isDark
                         ? Icons.dark_mode_rounded
                         : Icons.light_mode_rounded,
                     color: context.isDark ? const Color(0xFF845EF7) : AppColors.warning,
                     title: context.isDark ? 'Mode sombre activé' : 'Mode clair activé',
                     subtitle: 'Changer le thème de l\'application',
                     trailing: Switch(
-                      value: isDark,
+                      value: context.isDark,
                       onChanged: (_) => themeProvider.toggleTheme(),
                       activeThumbColor: AppColors.primary,
                     ),

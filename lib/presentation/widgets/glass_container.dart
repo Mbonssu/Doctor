@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../core/theme/color_extensions.dart';
 
-/// Widget réutilisable pour créer un effet glassmorphism (verre dépoli)
+/// Widget réutilisable glassmorphism (verre dépoli).
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final double? width;
@@ -33,7 +33,7 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _isDark = context.isDark;
+    final isDark = context.isDark;
     final defaultColor = color ?? (isDark ? Colors.white : Colors.black);
 
     return Container(
@@ -64,7 +64,7 @@ class GlassContainer extends StatelessWidget {
   }
 }
 
-/// Widget pour créer un effet glass avec gradient
+/// Glass container avec gradient.
 class GlassGradientContainer extends StatelessWidget {
   final Widget child;
   final double? width;
@@ -97,7 +97,7 @@ class GlassGradientContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _isDark = context.isDark;
+    final isDark = context.isDark;
     final defaultGradient = gradientColors ??
         (isDark
             ? [
