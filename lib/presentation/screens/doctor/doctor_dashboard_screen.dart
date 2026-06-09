@@ -1,8 +1,44 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import '../../../core/di/app_services.dart';
 import '../../../core/network/api_exception.dart';
+
+// ─── Modèles légers (à migrer dans data/models quand l'API est prête) ────────
+
+class _DoctorStats {
+  final int appointmentsToday;
+  final int totalPatients;
+  final String monthlyRevenue;
+  final double avgRating;
+
+  const _DoctorStats({
+    required this.appointmentsToday,
+    required this.totalPatients,
+    required this.monthlyRevenue,
+    required this.avgRating,
+  });
+}
+
+class _UpcomingAppointment {
+  final String patientName;
+  final String patientInitial;
+  final String time;
+  final String type;
+  final AppointmentStatus status;
+
+  const _UpcomingAppointment({
+    required this.patientName,
+    required this.time,
+    required this.type,
+    required this.status,
+  }) : patientInitial = patientName.isEmpty ? '?' : patientName[0];
+}
+
+enum AppointmentStatus { pending, confirmed, completed }
+
+// ─── Screen ──────────────────────────────────────────────────────────────────
 
 class DoctorDashboardScreen extends StatefulWidget {
   const DoctorDashboardScreen({super.key});
@@ -11,9 +47,15 @@ class DoctorDashboardScreen extends StatefulWidget {
   State<DoctorDashboardScreen> createState() => _DoctorDashboardScreenState();
 }
 
-class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
+class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
+    with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
   String? _errorMessage;
+  _DoctorStats? _stats;
+  List<_UpcomingAppointment> _upcoming = [];
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -22,27 +64,49 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
   }
 
   Future<void> _loadDashboardData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
-
       final user = AppServices.authSessionManager.user;
-      if (user == null) {
-        setState(() {
-          _errorMessage = 'Utilisateur non trouvé';
-          _isLoading = false;
-        });
-        return;
-      }
+      if (user == null) throw const ApiException('Utilisateur non trouvé');
 
-      // TODO: Récupérer les stats du docteur via DoctorService
-      // Pour maintenant, on simule les données
+      // TODO: remplacer par un vrai appel DoctorService
+      await Future.delayed(const Duration(milliseconds: 600));
+
+      if (!mounted) return;
       setState(() {
+        _stats = const _DoctorStats(
+          appointmentsToday: 8,
+          totalPatients: 324,
+          monthlyRevenue: '2.4M',
+          avgRating: 4.8,
+        );
+        _upcoming = const [
+          _UpcomingAppointment(
+            patientName: 'Jean Kouassi',
+            time: '09:30',
+            type: 'Consultation générale',
+            status: AppointmentStatus.confirmed,
+          ),
+          _UpcomingAppointment(
+            patientName: 'Marie Traoré',
+            time: '11:00',
+            type: 'Suivi cardiaque',
+            status: AppointmentStatus.pending,
+          ),
+          _UpcomingAppointment(
+            patientName: 'Pierre Yao',
+            time: '14:30',
+            type: 'Visite post-opératoire',
+            status: AppointmentStatus.confirmed,
+          ),
+        ];
         _isLoading = false;
       });
     } on ApiException catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.message;
         _isLoading = false;
@@ -52,137 +116,276 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: context.bgColor,
-        body: const Center(child: CircularProgressIndicator()),
-      );
+    super.build(context);
+
+    if (_isLoading) return _LoadingView();
+    if (_errorMessage != null) {
+      return _ErrorView(message: _errorMessage!, onRetry: _loadDashboardData);
     }
 
-    if (_errorMessage != null) {
-      return Scaffold(
-        backgroundColor: context.bgColor,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 64, color: AppColors.danger),
-              const SizedBox(height: 16),
-              Text(_errorMessage!, style: const TextStyle(color: AppColors.danger)),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadDashboardData,
-                child: const Text('Réessayer'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+    final user = AppServices.authSessionManager.user;
+    final greeting = _buildGreeting();
 
     return Scaffold(
-      backgroundColor: context.bgColor,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Titre
-              Text(
-                'Tableau de Bord',
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.textColor,
+        child: RefreshIndicator(
+          onRefresh: _loadDashboardData,
+          color: AppColors.primary,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // ─── Header ───────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: _DashboardHeader(
+                    greeting: greeting,
+                    doctorName: 'Dr. ${user?.lastName ?? 'Médecin'}',
+                    avatarInitial: user?.firstName[0] ?? 'D',
+                  ),
                 ),
               ),
-              const SizedBox(height: 24),
 
-              // Cartes de statistiques
-              GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _StatCard(
-                    title: 'RDV du jour',
-                    value: '8',
-                    icon: Icons.calendar_today_rounded,
-                    color: AppColors.primary,
-                    context: context,
-                  ),
-                  _StatCard(
-                    title: 'Patients',
-                    value: '324',
-                    icon: Icons.people_outline_rounded,
-                    color: const Color(0xFF00C48C),
-                    context: context,
-                  ),
-                  _StatCard(
-                    title: 'Revenus (mois)',
-                    value: '2.4M',
-                    icon: Icons.trending_up_rounded,
-                    color: const Color(0xFFFFB800),
-                    context: context,
-                  ),
-                  _StatCard(
-                    title: 'Note moyenne',
-                    value: '4.8',
-                    icon: Icons.star_rounded,
-                    color: const Color(0xFFFF6B6B),
-                    context: context,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 32),
-
-              // Section: Rendez-vous à venir
-              Text(
-                'Rendez-vous à venir',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.textColor,
+              // ─── Stats grid ───────────────────────────────────────────────
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _StatsGrid(stats: _stats!),
                 ),
               ),
-              const SizedBox(height: 12),
-              _UpcomingAppointmentsList(context: context),
 
-              const SizedBox(height: 32),
-
-              // Section: Patients récents
-              Text(
-                'Patients récents',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.textColor,
+              // ─── Quick actions ────────────────────────────────────────────
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _QuickActions(),
                 ),
               ),
-              const SizedBox(height: 12),
-              _RecentPatientsList(context: context),
+
+              // ─── Upcoming appointments ────────────────────────────────────
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
+                sliver: SliverToBoxAdapter(
+                  child: _SectionHeader(
+                    title: 'Rendez-vous du jour',
+                    subtitle: '${_upcoming.length} à venir',
+                    onSeeAll: () {},
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _AppointmentCard(appointment: _upcoming[i]),
+                    ),
+                    childCount: _upcoming.length,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  String _buildGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title;
+// ─── Header ──────────────────────────────────────────────────────────────────
+
+class _DashboardHeader extends StatelessWidget {
+  final String greeting;
+  final String doctorName;
+  final String avatarInitial;
+
+  const _DashboardHeader({
+    required this.greeting,
+    required this.doctorName,
+    required this.avatarInitial,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                greeting,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: context.mutedText,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                doctorName,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: context.textColor,
+                  letterSpacing: -0.5,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Notification bell
+        Container(
+          width: 40,
+          height: 40,
+          margin: const EdgeInsets.only(right: 10),
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: context.dividerColor, width: 1),
+          ),
+          child: Stack(
+            children: [
+              Icon(
+                Icons.notifications_outlined,
+                size: 20,
+                color: context.mutedText,
+              ),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: AppColors.danger,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        // Avatar
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: AppColors.primaryGradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Center(
+            child: Text(
+              avatarInitial,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Stats grid ──────────────────────────────────────────────────────────────
+
+class _StatsGrid extends StatelessWidget {
+  final _DoctorStats stats;
+
+  const _StatsGrid({required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _StatData(
+        label: 'RDV du jour',
+        value: '${stats.appointmentsToday}',
+        icon: Icons.calendar_today_rounded,
+        color: AppColors.primary,
+        trend: '+2 vs hier',
+        trendPositive: true,
+      ),
+      _StatData(
+        label: 'Patients',
+        value: '${stats.totalPatients}',
+        icon: Icons.people_outline_rounded,
+        color: AppColors.accent,
+        trend: '+12 ce mois',
+        trendPositive: true,
+      ),
+      _StatData(
+        label: 'Revenus (mois)',
+        value: stats.monthlyRevenue,
+        icon: Icons.trending_up_rounded,
+        color: AppColors.warning,
+        trend: 'FCFA',
+        trendPositive: true,
+      ),
+      _StatData(
+        label: 'Note moy.',
+        value: '${stats.avgRating}',
+        icon: Icons.star_rounded,
+        color: AppColors.cardio,
+        trend: '234 avis',
+        trendPositive: true,
+      ),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 1.55,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) => _StatCard(data: items[i]),
+    );
+  }
+}
+
+class _StatData {
+  final String label;
   final String value;
   final IconData icon;
   final Color color;
-  final BuildContext context;
+  final String trend;
+  final bool trendPositive;
 
-  const _StatCard({
-    required this.title,
+  const _StatData({
+    required this.label,
     required this.value,
     required this.icon,
     required this.color,
-    required this.context,
+    required this.trend,
+    required this.trendPositive,
   });
+}
+
+class _StatCard extends StatelessWidget {
+  final _StatData data;
+
+  const _StatCard({required this.data});
 
   @override
   Widget build(BuildContext context) {
@@ -191,28 +394,74 @@ class _StatCard extends StatelessWidget {
         color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.dividerColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: context.isDark
+                ? Colors.black.withValues(alpha: 0.25)
+                : data.color.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: color, size: 28),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: data.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(data.icon, color: data.color, size: 16),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: data.trendPositive
+                      ? AppColors.successLight
+                      : AppColors.dangerLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  data.trend,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: data.trendPositive
+                        ? AppColors.successText
+                        : AppColors.dangerText,
+                  ),
+                ),
+              ),
+            ],
+          ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: context.mutedText,
+                data.value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: context.textColor,
+                  letterSpacing: -0.5,
+                  height: 1.1,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
-                value,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: context.textColor,
+                data.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: context.mutedText,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ],
@@ -223,150 +472,244 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-class _UpcomingAppointmentsList extends StatelessWidget {
-  final BuildContext context;
+// ─── Quick actions ────────────────────────────────────────────────────────────
 
-  const _UpcomingAppointmentsList({required this.context});
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Charger les vrais rendez-vous depuis l'API
+    final actions = [
+      _QuickAction(
+        label: 'Nouveau RDV',
+        icon: Icons.add_circle_outline_rounded,
+        color: AppColors.primary,
+        onTap: () {},
+      ),
+      _QuickAction(
+        label: 'Mes patients',
+        icon: Icons.people_outline_rounded,
+        color: AppColors.accent,
+        onTap: () {},
+      ),
+      _QuickAction(
+        label: 'Ordonnance',
+        icon: Icons.description_outlined,
+        color: AppColors.warning,
+        onTap: () {},
+      ),
+      _QuickAction(
+        label: 'Messages',
+        icon: Icons.chat_bubble_outline_rounded,
+        color: AppColors.neuro,
+        onTap: () {},
+      ),
+    ];
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _AppointmentTile(
-          patientName: 'Jean Kouassi',
-          time: '09:30',
-          type: 'Consultation',
-          context: context,
+        Text(
+          'Actions rapides',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: context.textColor,
+            letterSpacing: -0.2,
+          ),
         ),
         const SizedBox(height: 12),
-        _AppointmentTile(
-          patientName: 'Marie Traoré',
-          time: '11:00',
-          type: 'Suivi',
-          context: context,
-        ),
-        const SizedBox(height: 12),
-        _AppointmentTile(
-          patientName: 'Pierre Yao',
-          time: '14:30',
-          type: 'Consultation',
-          context: context,
+        Row(
+          children: actions
+              .map(
+                (a) => Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _QuickActionButton(action: a),
+                  ),
+                ),
+              )
+              .toList(),
         ),
       ],
     );
   }
 }
 
-class _AppointmentTile extends StatelessWidget {
-  final String patientName;
-  final String time;
-  final String type;
-  final BuildContext context;
+class _QuickAction {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
 
-  const _AppointmentTile({
-    required this.patientName,
-    required this.time,
-    required this.type,
-    required this.context,
+  const _QuickAction({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final _QuickAction action;
+
+  const _QuickActionButton({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: action.onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: action.color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: action.color.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(action.icon, color: action.color, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              action.label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: action.color,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Section header ───────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final VoidCallback? onSeeAll;
+
+  const _SectionHeader({
+    required this.title,
+    this.subtitle,
+    this.onSeeAll,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: context.dividerColor, width: 1),
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(Icons.person_outline_rounded, color: AppColors.primary),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  patientName,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: context.textColor,
-                  ),
-                ),
-                Text(
-                  type,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            time,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RecentPatientsList extends StatelessWidget {
-  final BuildContext context;
-
-  const _RecentPatientsList({required this.context});
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: Charger les vrais patients depuis l'API
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _PatientTile('Alice Dupont', 'Cardiologue', context),
-        const SizedBox(height: 8),
-        _PatientTile('Bob Martin', 'Généraliste', context),
-        const SizedBox(height: 8),
-        _PatientTile('Carol Johnson', 'Pédiatre', context),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: context.textColor,
+                letterSpacing: -0.2,
+              ),
+            ),
+            if (subtitle != null)
+              Text(
+                subtitle!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: context.mutedText,
+                ),
+              ),
+          ],
+        ),
+        if (onSeeAll != null)
+          GestureDetector(
+            onTap: onSeeAll,
+            child: Text(
+              'Voir tout',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _PatientTile extends StatelessWidget {
-  final String name;
-  final String lastVisit;
-  final BuildContext context;
+// ─── Appointment card ─────────────────────────────────────────────────────────
 
-  const _PatientTile(this.name, this.lastVisit, this.context);
+class _AppointmentCard extends StatelessWidget {
+  final _UpcomingAppointment appointment;
+
+  const _AppointmentCard({required this.appointment});
 
   @override
   Widget build(BuildContext context) {
+    final statusColor = switch (appointment.status) {
+      AppointmentStatus.confirmed => AppColors.success,
+      AppointmentStatus.pending => AppColors.warning,
+      AppointmentStatus.completed => AppColors.primary,
+    };
+    final statusLabel = switch (appointment.status) {
+      AppointmentStatus.confirmed => 'Confirmé',
+      AppointmentStatus.pending => 'En attente',
+      AppointmentStatus.completed => 'Complété',
+    };
+
     return Container(
       decoration: BoxDecoration(
         color: context.cardColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.dividerColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: context.isDark ? 0.2 : 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(14),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-            child: Text(name[0], style: const TextStyle(fontWeight: FontWeight.bold)),
+          // Avatar with gradient
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.7),
+                  AppColors.primary,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                appointment.patientInitial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -374,26 +717,136 @@ class _PatientTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  appointment.patientName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     color: context.textColor,
+                    letterSpacing: -0.1,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  lastVisit,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  appointment.type,
+                  style: TextStyle(
+                    fontSize: 12,
                     color: context.mutedText,
                   ),
                 ),
               ],
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.chevron_right_rounded, color: context.mutedText),
-            onPressed: () {},
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                appointment.time,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── States ───────────────────────────────────────────────────────────────────
+
+class _LoadingView extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
+        child: CircularProgressIndicator(
+          color: AppColors.primary,
+          strokeWidth: 2.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.dangerLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(
+                  Icons.wifi_off_rounded,
+                  size: 36,
+                  color: AppColors.danger,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: context.textColor,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Réessayer'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
