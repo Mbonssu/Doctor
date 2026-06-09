@@ -243,6 +243,10 @@ class _NotifTile extends StatelessWidget {
   }
 }
 
+// extension on BuildContext {
+//   get primary100Color => null;
+// }
+
 class _NotifFilter extends StatelessWidget {
   final String label;
   final bool active;

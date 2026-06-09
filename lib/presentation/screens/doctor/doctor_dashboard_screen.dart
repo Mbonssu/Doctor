@@ -1,4 +1,4 @@
-import 'dart:ui';
+// import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
@@ -28,7 +28,7 @@ class _UpcomingAppointment {
   final String type;
   final AppointmentStatus status;
 
-  const _UpcomingAppointment({
+   _UpcomingAppointment({
     required this.patientName,
     required this.time,
     required this.type,
@@ -70,7 +70,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
     });
     try {
       final user = AppServices.authSessionManager.user;
-      if (user == null) throw const ApiException('Utilisateur non trouvé');
+      if (user == null) throw ApiException(message: "Utilisateur non trouvé");
 
       // TODO: remplacer par un vrai appel DoctorService
       await Future.delayed(const Duration(milliseconds: 600));
@@ -83,7 +83,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
           monthlyRevenue: '2.4M',
           avgRating: 4.8,
         );
-        _upcoming = const [
+        _upcoming = [
           _UpcomingAppointment(
             patientName: 'Jean Kouassi',
             time: '09:30',
