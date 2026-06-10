@@ -4,7 +4,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import '../../../data/models/auth/register_request.dart';
-import '../home/main_navigation.dart';
+import '../../authenticated_content.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -27,6 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _acceptTerms = false;
   int _currentStep = 0;
+  String _selectedRole = 'patient'; // 'patient' ou 'doctor'
 
   @override
   void dispose() {
@@ -64,15 +65,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
           firstName: _firstNameCtrl.text.trim(),
           lastName: _lastNameCtrl.text.trim(),
           phone: _phoneCtrl.text.trim(),
+          role: _selectedRole,
         ),
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(_snack('Compte créé avec succès ! 🎉', AppColors.success));
+      ScaffoldMessenger.of(context).showSnackBar(
+        _snack('Compte créé avec succès ! 🎉', AppColors.success));
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
+        MaterialPageRoute(builder: (_) => const AuthenticatedContent()),
       );
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -140,11 +141,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Padding(
-                    padding: EdgeInsets.only(left: 20),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 20),
                     child: Text(
-                      'Rejoignez des milliers de patients',
-                      style: TextStyle(fontSize: 14, color: Colors.white60),
+                      _selectedRole == 'doctor'
+                          ? 'Rejoignez notre réseau de médecins'
+                          : 'Rejoignez des milliers de patients',
+                      style: const TextStyle(fontSize: 14, color: Colors.white60),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -201,6 +204,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       // Étape 1 — Identité
                       if (_currentStep == 0) ...[
+                        // ── SÉLECTEUR DE RÔLE ──
+                        _SectionHeader(title: 'Je suis…'),
+                        const SizedBox(height: 14),
+                        Row(children: [
+                          Expanded(child: _RoleCard(
+                            label: 'Patient',
+                            subtitle: 'Je cherche un médecin',
+                            icon: Icons.person_rounded,
+                            color: AppColors.primary,
+                            selected: _selectedRole == 'patient',
+                            onTap: () => setState(() => _selectedRole = 'patient'),
+                          )),
+                          const SizedBox(width: 12),
+                          Expanded(child: _RoleCard(
+                            label: 'Médecin',
+                            subtitle: 'Je propose des consultations',
+                            icon: Icons.medical_services_rounded,
+                            color: const Color(0xFF00C48C),
+                            selected: _selectedRole == 'doctor',
+                            onTap: () => setState(() => _selectedRole = 'doctor'),
+                          )),
+                        ]),
+                        const SizedBox(height: 28),
                         _SectionHeader(title: 'Votre identité'),
                         const SizedBox(height: 20),
                         Row(
@@ -898,6 +924,83 @@ class _PasswordStrengthBar extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+// ── ROLE CARD ─────────────────────────────────────────────────────────────────
+
+class _RoleCard extends StatelessWidget {
+  final String label, subtitle;
+  final IconData icon;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RoleCard({
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.08) : context.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? color : context.dividerColor,
+            width: selected ? 2 : 1,
+          ),
+          boxShadow: selected
+              ? [BoxShadow(color: color.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4))]
+              : [],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: selected ? 0.15 : 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 22, height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? color : Colors.transparent,
+                border: Border.all(
+                  color: selected ? color : context.dividerColor,
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check_rounded, color: Colors.white, size: 13)
+                  : null,
+            ),
+          ]),
+          const SizedBox(height: 12),
+          Text(label, style: TextStyle(
+            fontSize: 15, fontWeight: FontWeight.w800,
+            color: selected ? color : context.textColor,
+          )),
+          const SizedBox(height: 3),
+          Text(subtitle, style: TextStyle(
+            fontSize: 11, color: context.mutedText, height: 1.3,
+          )),
+        ]),
+      ),
     );
   }
 }

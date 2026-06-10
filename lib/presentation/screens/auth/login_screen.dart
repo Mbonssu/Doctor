@@ -4,7 +4,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import '../../../data/models/auth/login_request.dart';
-import '../home/main_navigation.dart';
+import '../../authenticated_content.dart';
 import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -43,7 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
+        MaterialPageRoute(builder: (_) => const AuthenticatedContent()),
       );
     } on ApiException catch (error) {
       if (!mounted) return;
