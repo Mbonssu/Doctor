@@ -1,940 +1,559 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
-
-// ─── Modèle ──────────────────────────────────────────────────────────────────
-
-class TimeSlot {
-  final String time;
-  bool available;
-  bool isBooked; // true = créneau pris par un patient
-
-  TimeSlot({
-    required this.time,
-    required this.available,
-    this.isBooked = false,
-  });
-
-  TimeSlot copyWith({bool? available, bool? isBooked}) => TimeSlot(
-        time: time,
-        available: available ?? this.available,
-        isBooked: isBooked ?? this.isBooked,
-      );
-}
-
-class _DayConfig {
-  final String shortName;
-  final String fullName;
-  final int dateOffset; // relatif à aujourd'hui
-
-  const _DayConfig({
-    required this.shortName,
-    required this.fullName,
-    required this.dateOffset,
-  });
-}
-
-// ─── Screen ──────────────────────────────────────────────────────────────────
+import '../../../core/di/app_services.dart';
+import '../../../data/models/doctor_schedule/doctor_schedule_model.dart';
 
 class DoctorScheduleScreen extends StatefulWidget {
   const DoctorScheduleScreen({super.key});
-
   @override
   State<DoctorScheduleScreen> createState() => _DoctorScheduleScreenState();
 }
 
 class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
     with AutomaticKeepAliveClientMixin {
-  int _selectedDayIndex = 0;
-  bool _isSaving = false;
-
-  final _today = DateTime.now();
-
-  final _days = const [
-    _DayConfig(shortName: 'Lun', fullName: 'Lundi', dateOffset: 0),
-    _DayConfig(shortName: 'Mar', fullName: 'Mardi', dateOffset: 1),
-    _DayConfig(shortName: 'Mer', fullName: 'Mercredi', dateOffset: 2),
-    _DayConfig(shortName: 'Jeu', fullName: 'Jeudi', dateOffset: 3),
-    _DayConfig(shortName: 'Ven', fullName: 'Vendredi', dateOffset: 4),
-    _DayConfig(shortName: 'Sam', fullName: 'Samedi', dateOffset: 5),
-    _DayConfig(shortName: 'Dim', fullName: 'Dimanche', dateOffset: 6),
-  ];
-
-  // TODO: charger depuis API au lieu de données mock
-  late final Map<int, List<TimeSlot>> _schedule = {
-    0: _buildSlots(['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
-        booked: ['10:00']),
-    1: _buildSlots(['08:00', '09:00', '10:00', '11:00', '14:00', '15:00', '16:00'],
-        unavailable: ['09:00']),
-    2: [],
-    3: _buildSlots(['09:00', '10:00', '11:00', '14:00', '15:00'],
-        booked: ['11:00']),
-    4: _buildSlots(['08:00', '09:00', '10:00', '11:00', '14:00', '15:00'],
-        unavailable: ['14:00']),
-    5: [],
-    6: [],
-  };
-
-  // Config générale (éditable)
-  int _consultDurationMinutes = 30;
-  int _bufferMinutes = 15;
-  int _maxPatientsPerDay = 20;
 
   @override
   bool get wantKeepAlive => true;
 
-  List<TimeSlot> _buildSlots(
-    List<String> times, {
-    List<String> unavailable = const [],
-    List<String> booked = const [],
-  }) {
-    return times
-        .map((t) => TimeSlot(
-              time: t,
-              available: !unavailable.contains(t),
-              isBooked: booked.contains(t),
-            ))
-        .toList();
-  }
+  int _selectedDay = DateTime.now().weekday - 1;
+  bool _isSaving = false;
+  bool _isLoading = true;
+  String? _error;
 
-  List<TimeSlot> get _currentSlots => _schedule[_selectedDayIndex] ?? [];
+  final _days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
-  int get _availableCount =>
-      _currentSlots.where((s) => s.available && !s.isBooked).length;
-
-  int get _bookedCount => _currentSlots.where((s) => s.isBooked).length;
+  // État local éditable
+  int _consultDuration = 30;
+  int _breakDuration = 10;
+  int _maxPatients = 20;
+  final Set<int> _restDays = {5, 6};
+  final Map<int, Set<String>> _slots = {
+    for (int i = 0; i < 7; i++) i: {},
+  };
+  final Map<int, Set<String>> _bookedSlots = {}; // créneaux pris (non modifiables)
 
   @override
-  Widget build(BuildContext context) {
-    super.build(context);
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: _buildAppBar(context),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            _WeekSelector(
-              days: _days,
-              selectedIndex: _selectedDayIndex,
-              today: _today,
-              onSelect: (i) => setState(() => _selectedDayIndex = i),
-            ),
-            const SizedBox(height: 20),
-            _DaySummary(
-              dayName: _days[_selectedDayIndex].fullName,
-              availableCount: _availableCount,
-              bookedCount: _bookedCount,
-            ),
-            const SizedBox(height: 20),
-            if (_currentSlots.isEmpty)
-              _EmptyDayView(
-                onAdd: () => _showAddSlotsSheet(context),
-              )
-            else ...[
-              _SlotsGrid(
-                slots: _currentSlots,
-                onToggle: (slot) {
-                  if (slot.isBooked) return; // ne peut pas désactiver un slot pris
-                  setState(() => slot.available = !slot.available);
-                },
-              ),
-              const SizedBox(height: 16),
-              _SaveButton(
-                isSaving: _isSaving,
-                onSave: _saveSchedule,
-              ),
-            ],
-            const SizedBox(height: 32),
-            _ConsultationConfig(
-              durationMinutes: _consultDurationMinutes,
-              bufferMinutes: _bufferMinutes,
-              maxPatients: _maxPatientsPerDay,
-              onEditDuration: () => _showPickerDialog(
-                context,
-                title: 'Durée de consultation',
-                values: [15, 20, 30, 45, 60],
-                unit: 'min',
-                current: _consultDurationMinutes,
-                onSelect: (v) => setState(() => _consultDurationMinutes = v),
-              ),
-              onEditBuffer: () => _showPickerDialog(
-                context,
-                title: 'Intervalle entre RDV',
-                values: [5, 10, 15, 20, 30],
-                unit: 'min',
-                current: _bufferMinutes,
-                onSelect: (v) => setState(() => _bufferMinutes = v),
-              ),
-              onEditMaxPatients: () => _showPickerDialog(
-                context,
-                title: 'Patients par jour',
-                values: [5, 10, 15, 20, 25, 30],
-                unit: 'patients',
-                current: _maxPatientsPerDay,
-                onSelect: (v) => setState(() => _maxPatientsPerDay = v),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _loadSchedule();
   }
 
-  PreferredSizeWidget _buildAppBar(BuildContext context) {
-    return AppBar(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      centerTitle: false,
-      title: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Horaires',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: context.textColor,
-              letterSpacing: -0.5,
-            ),
-          ),
-          Text(
-            'Gérez vos disponibilités',
-            style: TextStyle(
-              fontSize: 12,
-              color: context.mutedText,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.add_rounded,
-              color: AppColors.primary,
-              size: 18,
-            ),
-          ),
-          onPressed: () => _showAddSlotsSheet(context),
-        ),
-        const SizedBox(width: 8),
-      ],
-    );
+  // ─── API ────────────────────────────────────────────────────────────────────
+
+  Future<void> _loadSchedule() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final data = await AppServices.doctorRepository.getMySchedule();
+
+      // Construire l'état local depuis la réponse API
+      for (final s in data.schedules) {
+        if (!s.isWorkingDay) _restDays.add(s.dayOfWeek);
+        // Utiliser les settings du premier jour comme config globale
+        if (s.dayOfWeek == _selectedDay) {
+          _consultDuration = s.consultDurationMin;
+          _breakDuration = s.breakDurationMin;
+          _maxPatients = s.maxPatients;
+        }
+      }
+      for (final slot in data.slots) {
+        if (slot.isActive) {
+          (_slots[slot.dayOfWeek] ??= {}).add(slot.time);
+        }
+      }
+    } catch (e) {
+      // En cas d'erreur (ex: pas encore de schedule), on garde les valeurs par défaut
+      _error = null; // pas bloquant, l'utilisateur peut configurer depuis zéro
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
-  Future<void> _saveSchedule() async {
+  Future<void> _save() async {
     setState(() => _isSaving = true);
     try {
-      // TODO: sauvegarder via API
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Horaires enregistrés'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
+      final daySlots = (_slots[_selectedDay] ?? {})
+          .where((t) => !(_bookedSlots[_selectedDay] ?? {}).contains(t))
+          .toList()
+        ..sort();
+
+      await AppServices.doctorRepository.updateMySchedule(
+        dayOfWeek: _selectedDay,
+        isWorkingDay: !_restDays.contains(_selectedDay),
+        consultDurationMin: _consultDuration,
+        breakDurationMin: _breakDuration,
+        maxPatients: _maxPatients,
+        slots: daySlots,
       );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Row(children: const [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('Horaires enregistrés'),
+        ]),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Erreur : ${e.toString()}'),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+      ));
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  void _showAddSlotsSheet(BuildContext context) {
-    // TODO: bottom sheet pour ajouter des créneaux
+  // ─── Actions locales ────────────────────────────────────────────────────────
+
+  void _toggleSlot(String time) {
+    if ((_bookedSlots[_selectedDay] ?? {}).contains(time)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Ce créneau a déjà un RDV réservé'),
+        backgroundColor: AppColors.warning,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
+    }
+    HapticFeedback.selectionClick();
+    setState(() {
+      final s = _slots[_selectedDay] ??= {};
+      if (s.contains(time)) s.remove(time); else s.add(time);
+    });
+  }
+
+  void _toggleRestDay(int day) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_restDays.contains(day)) {
+        _restDays.remove(day);
+      } else {
+        _restDays.add(day);
+        _slots[day]?.clear();
+      }
+    });
+  }
+
+  // ─── Dialogs ────────────────────────────────────────────────────────────────
+
+  void _showAddSlotSheet() {
+    final allSlots = <String>[];
+    for (int h = 7; h < 20; h++) {
+      allSlots.add('${h.toString().padLeft(2,'0')}:00');
+      allSlots.add('${h.toString().padLeft(2,'0')}:30');
+    }
+    String? selected;
     showModalBottomSheet(
       context: context,
-      backgroundColor: context.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const _AddSlotsPlaceholder(),
-    );
-  }
-
-  void _showPickerDialog(
-    BuildContext context, {
-    required String title,
-    required List<int> values,
-    required String unit,
-    required int current,
-    required void Function(int) onSelect,
-  }) {
-    showDialog(
-      context: context,
-      builder: (ctx) => _PickerDialog(
-        title: title,
-        values: values,
-        unit: unit,
-        current: current,
-        onSelect: (v) {
-          onSelect(v);
-          Navigator.pop(ctx);
-        },
-      ),
-    );
-  }
-}
-
-// ─── Week selector ────────────────────────────────────────────────────────────
-
-class _WeekSelector extends StatelessWidget {
-  final List<_DayConfig> days;
-  final int selectedIndex;
-  final DateTime today;
-  final ValueChanged<int> onSelect;
-
-  const _WeekSelector({
-    required this.days,
-    required this.selectedIndex,
-    required this.today,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 76,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: days.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final isSelected = selectedIndex == i;
-          final date = today.add(Duration(days: days[i].dateOffset));
-          final isToday = days[i].dateOffset == 0;
-
-          return GestureDetector(
-            onTap: () => onSelect(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              width: 56,
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(
-                        colors: AppColors.primaryGradient,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: isSelected ? null : context.cardColor,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isSelected
-                      ? Colors.transparent
-                      : isToday
-                          ? AppColors.primary
-                          : context.dividerColor,
-                  width: isToday && !isSelected ? 2 : 1,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    days[i].shortName,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                      color: isSelected ? Colors.white70 : context.mutedText,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${date.day}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: isSelected ? Colors.white : context.textColor,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ─── Day summary ──────────────────────────────────────────────────────────────
-
-class _DaySummary extends StatelessWidget {
-  final String dayName;
-  final int availableCount;
-  final int bookedCount;
-
-  const _DaySummary({
-    required this.dayName,
-    required this.availableCount,
-    required this.bookedCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.calendar_today_rounded,
-            color: AppColors.primary,
-            size: 16,
-          ),
-          const SizedBox(width: 10),
-          Text(
-            dayName,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primary,
-            ),
-          ),
-          const Spacer(),
-          _SummaryChip(
-            label: '$availableCount libres',
-            color: AppColors.success,
-          ),
-          const SizedBox(width: 8),
-          _SummaryChip(
-            label: '$bookedCount pris',
-            color: AppColors.warning,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _SummaryChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Slots grid ───────────────────────────────────────────────────────────────
-
-class _SlotsGrid extends StatelessWidget {
-  final List<TimeSlot> slots;
-  final void Function(TimeSlot) onToggle;
-
-  const _SlotsGrid({required this.slots, required this.onToggle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Créneaux horaires',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          'Appuyez pour activer / désactiver un créneau',
-          style: TextStyle(fontSize: 12, color: context.mutedText),
-        ),
-        const SizedBox(height: 14),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.6,
-          ),
-          itemCount: slots.length,
-          itemBuilder: (_, i) => _SlotChip(
-            slot: slots[i],
-            onToggle: () => onToggle(slots[i]),
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Legend
-        Row(
-          children: [
-            _LegendItem(color: AppColors.primary, label: 'Disponible'),
-            const SizedBox(width: 16),
-            _LegendItem(color: AppColors.warning, label: 'Réservé'),
-            const SizedBox(width: 16),
-            _LegendItem(color: AppColors.border, label: 'Inactif'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _LegendItem extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _LegendItem({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: context.mutedText),
-        ),
-      ],
-    );
-  }
-}
-
-class _SlotChip extends StatelessWidget {
-  final TimeSlot slot;
-  final VoidCallback onToggle;
-
-  const _SlotChip({required this.slot, required this.onToggle});
-
-  @override
-  Widget build(BuildContext context) {
-    final Color bg;
-    final Color textColor;
-    final Color borderColor;
-
-    if (slot.isBooked) {
-      bg = AppColors.warning.withValues(alpha: 0.15);
-      textColor = AppColors.warning;
-      borderColor = AppColors.warning.withValues(alpha: 0.3);
-    } else if (slot.available) {
-      bg = AppColors.primary.withValues(alpha: 0.1);
-      textColor = AppColors.primary;
-      borderColor = AppColors.primary.withValues(alpha: 0.3);
-    } else {
-      bg = context.cardColor;
-      textColor = context.mutedText;
-      borderColor = context.dividerColor;
-    }
-
-    return GestureDetector(
-      onTap: slot.isBooked ? null : onToggle,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: borderColor, width: 1.5),
-        ),
-        child: Center(
-          child: Text(
-            slot.time,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Save button ──────────────────────────────────────────────────────────────
-
-class _SaveButton extends StatelessWidget {
-  final bool isSaving;
-  final VoidCallback onSave;
-
-  const _SaveButton({required this.isSaving, required this.onSave});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: FilledButton.icon(
-        onPressed: isSaving ? null : onSave,
-        icon: isSaving
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Icon(Icons.check_rounded, size: 18),
-        label: Text(isSaving ? 'Enregistrement...' : 'Enregistrer'),
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Consultation config ──────────────────────────────────────────────────────
-
-class _ConsultationConfig extends StatelessWidget {
-  final int durationMinutes;
-  final int bufferMinutes;
-  final int maxPatients;
-  final VoidCallback onEditDuration;
-  final VoidCallback onEditBuffer;
-  final VoidCallback onEditMaxPatients;
-
-  const _ConsultationConfig({
-    required this.durationMinutes,
-    required this.bufferMinutes,
-    required this.maxPatients,
-    required this.onEditDuration,
-    required this.onEditBuffer,
-    required this.onEditMaxPatients,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Configuration générale',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: context.textColor,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _ConfigTile(
-          icon: Icons.timer_outlined,
-          title: 'Durée de consultation',
-          value: '$durationMinutes min',
-          onTap: onEditDuration,
-        ),
-        const SizedBox(height: 8),
-        _ConfigTile(
-          icon: Icons.schedule_outlined,
-          title: 'Intervalle entre RDV',
-          value: '$bufferMinutes min',
-          onTap: onEditBuffer,
-        ),
-        const SizedBox(height: 8),
-        _ConfigTile(
-          icon: Icons.people_outline_rounded,
-          title: 'Patients par jour',
-          value: '$maxPatients patients',
-          onTap: onEditMaxPatients,
-        ),
-      ],
-    );
-  }
-}
-
-class _ConfigTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final VoidCallback onTap;
-
-  const _ConfigTile({
-    required this.icon,
-    required this.title,
-    required this.value,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.6,
         decoration: BoxDecoration(
           color: context.cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: context.dividerColor, width: 1),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: context.textColor,
-                ),
-              ),
-            ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: 18,
-              color: context.mutedText,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Empty day ────────────────────────────────────────────────────────────────
-
-class _EmptyDayView extends StatelessWidget {
-  final VoidCallback onAdd;
-
-  const _EmptyDayView({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: context.primaryLight,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.event_available_outlined,
-                size: 36,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Pas de consultation ce jour',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: context.textColor,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Ajoutez des créneaux pour ce jour',
-              style: TextStyle(fontSize: 13, color: context.mutedText),
-            ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Ajouter des créneaux'),
-              style: FilledButton.styleFrom(
+        child: Column(children: [
+          const SizedBox(height: 8),
+          Center(child: Container(width: 40, height: 4,
+            decoration: BoxDecoration(color: context.dividerColor, borderRadius: BorderRadius.circular(2)))),
+          Padding(padding: const EdgeInsets.all(20), child: Row(children: [
+            Text('Ajouter un créneau — ${_days[_selectedDay]}',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: context.textColor)),
+          ])),
+          Expanded(child: ListView.builder(
+            itemCount: allSlots.length,
+            itemBuilder: (_, i) {
+              final t = allSlots[i];
+              final exists = (_slots[_selectedDay] ?? {}).contains(t);
+              final booked = (_bookedSlots[_selectedDay] ?? {}).contains(t);
+              return ListTile(
+                enabled: !booked,
+                title: Text(t, style: TextStyle(
+                  color: exists ? AppColors.accent : booked ? context.mutedText : context.textColor,
+                  fontWeight: selected == t ? FontWeight.w700 : FontWeight.normal,
+                )),
+                trailing: exists
+                    ? const Icon(Icons.check_circle_rounded, color: AppColors.accent, size: 18)
+                    : booked
+                        ? Text('RDV', style: TextStyle(fontSize: 11, color: AppColors.warning, fontWeight: FontWeight.w600))
+                        : selected == t
+                            ? const Icon(Icons.radio_button_checked_rounded, color: AppColors.primary)
+                            : const Icon(Icons.radio_button_unchecked_rounded),
+                onTap: exists || booked ? null : () => setS(() => selected = t),
+              );
+            },
+          )),
+          Padding(padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(ctx).viewInsets.bottom + 24),
+            child: ElevatedButton(
+              onPressed: selected == null ? null : () {
+                setState(() => (_slots[_selectedDay] ??= {}).add(selected!));
+                Navigator.pop(ctx);
+              },
+              style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Picker dialog ────────────────────────────────────────────────────────────
-
-class _PickerDialog extends StatelessWidget {
-  final String title;
-  final List<int> values;
-  final String unit;
-  final int current;
-  final ValueChanged<int> onSelect;
-
-  const _PickerDialog({
-    required this.title,
-    required this.values,
-    required this.unit,
-    required this.current,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: context.cardColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: context.textColor,
-          fontWeight: FontWeight.w700,
-          fontSize: 17,
-        ),
-      ),
-      content: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: values.map((v) {
-          final isSelected = v == current;
-          return GestureDetector(
-            onTap: () => onSelect(v),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : context.cardColor,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : context.dividerColor,
-                  width: 1.5,
-                ),
-              ),
-              child: Text(
-                '$v $unit',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : context.textColor,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            'Fermer',
-            style: TextStyle(color: context.mutedText),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Add slots placeholder ────────────────────────────────────────────────────
-
-class _AddSlotsPlaceholder extends StatelessWidget {
-  const _AddSlotsPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.dividerColor,
-              borderRadius: BorderRadius.circular(2),
+              child: const Text('Ajouter le créneau', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             ),
           ),
+        ]),
+      )),
+    );
+  }
+
+  void _showSettingsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Container(
+        padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 28),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Center(child: Container(width: 40, height: 4,
+            decoration: BoxDecoration(color: context.dividerColor, borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 20),
-          Text(
-            'Ajouter des créneaux',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: context.textColor,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Fonctionnalité à venir — sélection manuelle de plages horaires.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: context.mutedText,
-            ),
-          ),
+          Text('Paramètres de consultation',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: context.textColor)),
           const SizedBox(height: 24),
+          _SettingSlider(label: 'Durée de consultation', value: _consultDuration,
+            min: 15, max: 90, step: 15, suffix: 'min',
+            onChanged: (v) { setS(() {}); setState(() => _consultDuration = v); }),
+          const SizedBox(height: 20),
+          _SettingSlider(label: 'Pause entre RDV', value: _breakDuration,
+            min: 0, max: 30, step: 5, suffix: 'min',
+            onChanged: (v) { setS(() {}); setState(() => _breakDuration = v); }),
+          const SizedBox(height: 20),
+          _SettingSlider(label: 'Max patients / jour', value: _maxPatients,
+            min: 5, max: 40, step: 5, suffix: 'patients',
+            onChanged: (v) { setS(() {}); setState(() => _maxPatients = v); }),
+          const SizedBox(height: 28),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              minimumSize: const Size(double.infinity, 50),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Fermer'),
+          ),
+        ]),
+      )),
+    );
+  }
+
+  // ─── Build ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    final isRest = _restDays.contains(_selectedDay);
+    final daySlots = (_slots[_selectedDay] ?? {}).toList()..sort();
+    final dayBooked = _bookedSlots[_selectedDay] ?? {};
+    final bookedCount = daySlots.where((s) => dayBooked.contains(s)).length;
+    final freeCount = daySlots.length - bookedCount;
+
+    return Scaffold(
+      backgroundColor: context.bgColor,
+      body: NestedScrollView(
+        headerSliverBuilder: (_, __) => [
+          SliverAppBar(
+            pinned: true,
+            backgroundColor: context.bgColor,
+            elevation: 0,
+            centerTitle: true,
+            title: Text('Horaires & Disponibilités',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: context.textColor)),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.tune_rounded, color: AppColors.primary),
+                onPressed: _showSettingsSheet,
+              ),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(92),
+              child: Column(children: [
+                SizedBox(height: 80, child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _days.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final sel = _selectedDay == i;
+                    final rest = _restDays.contains(i);
+                    final count = (_slots[i] ?? {}).length;
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedDay = i),
+                      onLongPress: () => _toggleRestDay(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 56,
+                        decoration: BoxDecoration(
+                          color: sel ? AppColors.primary : rest
+                              ? AppColors.dangerBg : context.cardColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: sel ? AppColors.primary : rest
+                              ? AppColors.danger.withValues(alpha: 0.3) : context.dividerColor),
+                        ),
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Text(_days[i], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                            color: sel ? Colors.white : rest ? AppColors.danger : context.mutedText)),
+                          const SizedBox(height: 3),
+                          Text('${(DateTime.now().weekday - 1 == i) ? DateTime.now().day : DateTime.now().add(Duration(days: i - DateTime.now().weekday + 1)).day}',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                              color: sel ? Colors.white : context.textColor)),
+                          if (!rest && count > 0)
+                            Container(margin: const EdgeInsets.only(top: 3), width: 5, height: 5,
+                              decoration: BoxDecoration(shape: BoxShape.circle,
+                                color: sel ? Colors.white60 : AppColors.primary)),
+                          if (rest)
+                            Text('repos', style: TextStyle(fontSize: 8, color: AppColors.danger)),
+                        ]),
+                      ),
+                    );
+                  },
+                )),
+                const SizedBox(height: 6),
+              ]),
+            ),
+          ),
         ],
+        body: isRest
+            ? _RestDayView(day: _days[_selectedDay], onEnable: () => _toggleRestDay(_selectedDay))
+            : SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  // Résumé
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: [
+                        AppColors.primary.withValues(alpha: 0.08),
+                        AppColors.accent.withValues(alpha: 0.05),
+                      ]),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(children: [
+                      Expanded(child: _DayStat(value: '${daySlots.length}', label: 'Créneaux', color: AppColors.primary)),
+                      Container(width: 1, height: 36, color: context.dividerColor),
+                      Expanded(child: _DayStat(value: '$bookedCount', label: 'Réservés', color: AppColors.warning)),
+                      Container(width: 1, height: 36, color: context.dividerColor),
+                      Expanded(child: _DayStat(value: '$freeCount', label: 'Libres', color: AppColors.accent)),
+                    ]),
+                  ),
+                  const SizedBox(height: 20),
+
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text('Créneaux — ${_days[_selectedDay]}',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textColor)),
+                    GestureDetector(
+                      onTap: _showAddSlotSheet,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(children: const [
+                          Icon(Icons.add_rounded, size: 14, color: AppColors.primary),
+                          SizedBox(width: 4),
+                          Text('Ajouter', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                        ]),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 12),
+
+                  if (daySlots.isEmpty)
+                    _EmptySlotsView(onAdd: _showAddSlotSheet)
+                  else ...[
+                    // Matin
+                    final morning = daySlots.where((s) => int.parse(s.split(':')[0]) < 13).toList();
+                    final afternoon = daySlots.where((s) => int.parse(s.split(':')[0]) >= 13).toList();
+                    if (morning.isNotEmpty) ...[
+                      _slotGroupLabel('Matin', Icons.wb_sunny_outlined, AppColors.warning),
+                      const SizedBox(height: 8),
+                      _SlotGrid(slots: morning, booked: dayBooked, onToggle: _toggleSlot),
+                      const SizedBox(height: 20),
+                    ],
+                    if (afternoon.isNotEmpty) ...[
+                      _slotGroupLabel('Après-midi', Icons.nights_stay_outlined, AppColors.primary),
+                      const SizedBox(height: 8),
+                      _SlotGrid(slots: afternoon, booked: dayBooked, onToggle: _toggleSlot),
+                    ],
+                  ],
+
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: context.cardColor, borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: context.dividerColor)),
+                    child: Row(children: [
+                      Expanded(child: _ConfigChip(icon: Icons.timer_outlined, label: 'Durée', value: '$_consultDuration min')),
+                      Expanded(child: _ConfigChip(icon: Icons.pause_circle_outline, label: 'Pause', value: '$_breakDuration min')),
+                      Expanded(child: _ConfigChip(icon: Icons.people_outline_rounded, label: 'Max', value: '$_maxPatients/j')),
+                    ]),
+                  ),
+                ]),
+              ),
+      ),
+      floatingActionButton: isRest ? null : FloatingActionButton.extended(
+        onPressed: _isSaving ? null : _save,
+        backgroundColor: AppColors.primary,
+        icon: _isSaving
+            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.save_rounded, color: Colors.white),
+        label: Text(_isSaving ? 'Enregistrement...' : 'Enregistrer',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
       ),
     );
   }
+
+  Widget _slotGroupLabel(String label, IconData icon, Color color) =>
+    Row(children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 6),
+      Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+    ]);
+}
+
+// ── WIDGETS PARTAGÉS ──────────────────────────────────────────────────────────
+
+class _SlotGrid extends StatelessWidget {
+  final List<String> slots;
+  final Set<String> booked;
+  final void Function(String) onToggle;
+  const _SlotGrid({required this.slots, required this.booked, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) => GridView.builder(
+    shrinkWrap: true,
+    physics: const NeverScrollableScrollPhysics(),
+    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 4, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 2.0),
+    itemCount: slots.length,
+    itemBuilder: (_, i) {
+      final t = slots[i];
+      final isBooked = booked.contains(t);
+      return GestureDetector(
+        onTap: () => onToggle(t),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isBooked ? AppColors.warningBg : AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: isBooked
+                ? AppColors.warning.withValues(alpha: 0.5)
+                : AppColors.primary.withValues(alpha: 0.3)),
+          ),
+          child: Stack(alignment: Alignment.center, children: [
+            Text(t, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+              color: isBooked ? AppColors.warningText : AppColors.primary)),
+            if (isBooked)
+              Positioned(top: 4, right: 4, child: Container(width: 6, height: 6,
+                decoration: BoxDecoration(color: AppColors.warning, shape: BoxShape.circle))),
+          ]),
+        ),
+      );
+    },
+  );
+}
+
+class _SettingSlider extends StatelessWidget {
+  final String label, suffix;
+  final int value, min, max, step;
+  final void Function(int) onChanged;
+  const _SettingSlider({required this.label, required this.value, required this.min,
+    required this.max, required this.step, required this.suffix, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.textColor)),
+      Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+        child: Text('$value $suffix', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary))),
+    ]),
+    Slider(value: value.toDouble(), min: min.toDouble(), max: max.toDouble(),
+      divisions: (max - min) ~/ step, activeColor: AppColors.primary,
+      onChanged: (v) => onChanged(v.round())),
+  ]);
+}
+
+class _DayStat extends StatelessWidget {
+  final String value, label; final Color color;
+  const _DayStat({required this.value, required this.label, required this.color});
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+    Text(label, style: TextStyle(fontSize: 11, color: context.mutedText)),
+  ]);
+}
+
+class _ConfigChip extends StatelessWidget {
+  final IconData icon; final String label, value;
+  const _ConfigChip({required this.icon, required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) => Column(children: [
+    Icon(icon, size: 18, color: AppColors.primary),
+    const SizedBox(height: 4),
+    Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.textColor)),
+    Text(label, style: TextStyle(fontSize: 10, color: context.mutedText)),
+  ]);
+}
+
+class _RestDayView extends StatelessWidget {
+  final String day; final VoidCallback onEnable;
+  const _RestDayView({required this.day, required this.onEnable});
+  @override
+  Widget build(BuildContext context) => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    Container(width: 80, height: 80,
+      decoration: BoxDecoration(color: AppColors.dangerBg, shape: BoxShape.circle),
+      child: const Icon(Icons.hotel_rounded, size: 36, color: AppColors.danger)),
+    const SizedBox(height: 16),
+    Text('Jour de repos — $day', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.textColor)),
+    const SizedBox(height: 8),
+    Text('Appuie longuement sur le jour pour activer/désactiver',
+      textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: context.mutedText)),
+    const SizedBox(height: 24),
+    OutlinedButton.icon(onPressed: onEnable,
+      icon: const Icon(Icons.work_outline_rounded),
+      label: Text('Activer $day'),
+      style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
+        side: const BorderSide(color: AppColors.primary),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+  ]));
+}
+
+class _EmptySlotsView extends StatelessWidget {
+  final VoidCallback onAdd;
+  const _EmptySlotsView({required this.onAdd});
+  @override
+  Widget build(BuildContext context) => Center(child: Column(children: [
+    const SizedBox(height: 40),
+    Icon(Icons.schedule_outlined, size: 56, color: context.mutedText),
+    const SizedBox(height: 12),
+    Text('Aucun créneau configuré', style: TextStyle(fontSize: 15, color: context.mutedText)),
+    const SizedBox(height: 16),
+    ElevatedButton.icon(onPressed: onAdd,
+      icon: const Icon(Icons.add_rounded),
+      label: const Text('Ajouter des créneaux'),
+      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+    const SizedBox(height: 40),
+  ]));
 }
