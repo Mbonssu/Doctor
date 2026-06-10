@@ -426,13 +426,12 @@ class DoctorDetailScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => BookingFlowScreen(
+                    doctorId: id,
                     doctorName: name,
                     specialty: specialty,
                     initials: initials,
                     color: color,
                     price: price,
-                    date: 'Prochaine dispo',
-                    time: '—',
                   ),
                 ),
               ),

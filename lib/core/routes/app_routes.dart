@@ -21,7 +21,6 @@ import '../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../presentation/authenticated_content.dart';
 
 // Connection test (debug)
-import '../../presentation/pages/connection_test_page.dart';
 
 // Doctors
 import '../../presentation/screens/doctors/doctors_screen.dart';
@@ -190,7 +189,7 @@ class AppRoutes {
 
       // Debug
       case connectionTest:
-        return MaterialPageRoute(builder: (_) => const ConnectionTestPage());
+        return MaterialPageRoute(builder: (_) => const Scaffold(body: Center(child: Text('Page non disponible'))));
 
       // Doctor role routes (interface médecin)
       case doctorMain:
