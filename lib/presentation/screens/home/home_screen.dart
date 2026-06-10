@@ -6,6 +6,7 @@ import '../../../core/utils/modal_utils.dart';
 import '../../../core/di/app_services.dart';
 import '../../../data/models/appointment/appointment_model.dart';
 import '../../../data/models/doctor/doctor_model.dart';
+import '../../../data/models/doctor/doctor_list_response.dart';
 import '../booking/booking_flow_screen.dart';
 import '../health/health_screens.dart';
 import '../../widgets/shared_widgets.dart';
@@ -33,17 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final results = await Future.wait([
-        AppServices.appointmentsRepository.getUpcomingAppointments(limit: 5),
-        AppServices.doctorsRepository.searchDoctors(page: 1, pageSize: 3),
-      ]);
-      final upcoming = results[0] as List<AppointmentModel>;
-      final doctorsResp = results[1] as dynamic;
+      final upcoming = await AppServices.appointmentsRepository
+          .getUpcomingAppointments(limit: 5);
+      final doctorsResp = await AppServices.doctorsRepository
+          .searchDoctors(page: 1, pageSize: 3);
       if (mounted) {
         setState(() {
           _nextAppointment = upcoming.isNotEmpty ? upcoming.first : null;
           _upcomingCount = upcoming.length;
-          _topDoctors = doctorsResp.doctors ?? [];
+          _topDoctors = doctorsResp.doctors;
           _isLoading = false;
         });
       }

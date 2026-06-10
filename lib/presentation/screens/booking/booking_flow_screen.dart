@@ -1,30 +1,42 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
+import '../../../core/di/app_services.dart';
+import '../../../data/models/appointment/appointment_create_request.dart';
 import 'booking_success_screen.dart';
 
 class BookingFlowScreen extends StatefulWidget {
+  final int doctorId;
   final String doctorName;
   final String specialty;
   final String initials;
   final Color color;
   final String price;
-  final String date;
-  final String time;
+  final DateTime? appointmentDate;
 
   const BookingFlowScreen({
     super.key,
-    this.doctorName = 'Dr. Amine Toure',
-    this.specialty = 'Cardiologie',
-    this.initials = 'AT',
-    this.color = AppColors.cardio,
-    this.price = '15 000 FCFA',
-    this.date = 'Lun 19 Mai',
-    this.time = '14h30',
+    this.doctorId = 0,
+    this.doctorName = 'Dr. Médecin',
+    this.specialty = 'Spécialité',
+    this.initials = 'MD',
+    this.color = AppColors.primary,
+    this.price = '0 FCFA',
+    this.appointmentDate,
   });
 
   @override
   State<BookingFlowScreen> createState() => _BookingFlowScreenState();
+
+  DateTime get _date => appointmentDate ?? DateTime.now();
+  String get formattedDate {
+    const months = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+    const days = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    final d = _date;
+    return '${days[d.weekday-1]} ${d.day} ${months[d.month-1]}';
+  }
+  String get formattedTime =>
+    '${_date.hour.toString().padLeft(2,'0')}h${_date.minute.toString().padLeft(2,'0')}';
 }
 
 class _BookingFlowScreenState extends State<BookingFlowScreen>
@@ -102,25 +114,47 @@ class _BookingFlowScreenState extends State<BookingFlowScreen>
 
   Future<void> _confirmBooking() async {
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookingSuccessScreen(
-            doctorName: widget.doctorName,
-            specialty: widget.specialty,
-            initials: widget.initials,
-            color: widget.color,
-            date: widget.date,
-            time: widget.time,
-            location: 'Hôpital Central Yaoundé',
-            consultType: _consultType == 0 ? 'Présentiel' : 'Téléconsultation',
-            motif: _selectedReason >= 0 ? _reasons[_selectedReason] : 'Consultation',
-            bookingRef: 'DTP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-          ),
+    try {
+      final user = AppServices.authSessionManager.user;
+      final reason = _selectedReason >= 0 ? _reasons[_selectedReason] : null;
+      await AppServices.appointmentsRepository.createAppointment(
+        AppointmentCreateRequest(
+          patientId: user?.id ?? 0,
+          doctorId: widget.doctorId,
+          appointmentDate: widget._date,
+          durationMinutes: 30,
+          appointmentType: _consultType == 0 ? 'consultation' : 'teleconsult',
+          reason: reason,
         ),
       );
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookingSuccessScreen(
+              doctorName: widget.doctorName,
+              specialty: widget.specialty,
+              initials: widget.initials,
+              color: widget.color,
+              date: widget.formattedDate,
+              time: widget.formattedTime,
+              location: 'Hôpital Central',
+              consultType: _consultType == 0 ? 'Présentiel' : 'Téléconsultation',
+              motif: reason ?? 'Consultation',
+              bookingRef: 'DTP-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: AppColors.danger,
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
     }
   }
 
@@ -249,8 +283,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen>
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(widget.date, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.textPrimary)),
-                        Text(widget.time, style: TextStyle(fontSize: 11, color: context.textMuted)),
+                        Text(widget.formattedDate, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.textPrimary)),
+                        Text(widget.formattedTime, style: TextStyle(fontSize: 11, color: context.textMuted)),
                       ],
                     ),
                   ],
@@ -347,7 +381,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen>
           payments: _payments, selected: _paymentMethod,
           onSelect: (i) => setState(() => _paymentMethod = i),
           price: widget.price, doctorName: widget.doctorName,
-          date: widget.date, time: widget.time,
+          date: widget.formattedDate, time: widget.formattedTime,
           motif: _selectedReason >= 0 ? _reasons[_selectedReason] : '—',
           consultType: _consultType == 0 ? 'Présentiel' : 'Téléconsultation');
       default: return const SizedBox();

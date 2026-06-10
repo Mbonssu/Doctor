@@ -23,6 +23,9 @@ class DoctorRepository extends BaseRepository {
   Future<WeekScheduleResponse> getMySchedule() =>
       run(() => _apiService.getMySchedule());
 
+  Future<WeekScheduleResponse> getMyScheduleForDoctor(int doctorId) =>
+      run(() => _apiService.getScheduleForDoctor(doctorId));
+
   Future<WeekScheduleResponse> updateMySchedule({
     required int dayOfWeek,
     required bool isWorkingDay,

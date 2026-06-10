@@ -1,5 +1,6 @@
 import '../doctor/doctor_model.dart';
 import '../model_parsers.dart';
+import '../user/user_model.dart';
 
 class AppointmentModel {
   const AppointmentModel({
@@ -22,6 +23,7 @@ class AppointmentModel {
     this.createdAt,
     this.updatedAt,
     this.doctor,
+    this.patient,
   });
 
   final int id;
@@ -43,9 +45,11 @@ class AppointmentModel {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DoctorModel? doctor;
+  final UserModel? patient;
 
   factory AppointmentModel.fromJson(Map<String, dynamic> json) {
     final doctorJson = json['doctor'];
+    final patientJson = json['patient'];
     return AppointmentModel(
       id: parseInt(json['id']),
       patientId: parseInt(json['patient_id']),
@@ -69,6 +73,22 @@ class AppointmentModel {
       doctor: doctorJson is Map<String, dynamic>
           ? DoctorModel.fromJson(doctorJson)
           : null,
+      patient: patientJson is Map<String, dynamic>
+          ? UserModel.fromJson(patientJson)
+          : null,
     );
   }
+
+  AppointmentModel copyWith({String? status, String? doctorNotes}) =>
+      AppointmentModel(
+        id: id, patientId: patientId, doctorId: doctorId,
+        appointmentDate: appointmentDate, durationMinutes: durationMinutes,
+        appointmentType: appointmentType, consultationFee: consultationFee,
+        isPaid: isPaid, reason: reason, notes: notes, paymentMethod: paymentMethod,
+        cancelledBy: cancelledBy, cancellationReason: cancellationReason,
+        cancelledAt: cancelledAt, createdAt: createdAt, updatedAt: updatedAt,
+        doctor: doctor, patient: patient,
+        status: status ?? this.status,
+        doctorNotes: doctorNotes ?? this.doctorNotes,
+      );
 }

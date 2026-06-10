@@ -47,6 +47,13 @@ class DoctorApiService {
     return WeekScheduleResponse.fromJson(response.data ?? {});
   }
 
+  Future<WeekScheduleResponse> getScheduleForDoctor(int doctorId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '${ApiConfig.doctorsEndpoint}/$doctorId/schedule',
+    );
+    return WeekScheduleResponse.fromJson(response.data ?? {});
+  }
+
   Future<WeekScheduleResponse> updateMySchedule({
     required int dayOfWeek,
     required bool isWorkingDay,

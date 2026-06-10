@@ -69,8 +69,8 @@ class NavigationHelper {
   }
 
   // Doctors
-  static Future<void> goToDoctorDetail(BuildContext context) {
-    return navigateTo(context, AppRoutes.doctorDetail);
+  static Future<void> goToDoctorDetail(BuildContext context, {Map<String, dynamic>? arguments}) {
+    return navigateTo(context, AppRoutes.doctorDetail, arguments: arguments);
   }
 
   static Future<void> goToDoctorReviews(BuildContext context) {

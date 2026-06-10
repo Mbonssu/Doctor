@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import '../../../core/utils/modal_utils.dart';
 import '../../../data/models/doctor/doctor_model.dart';
+import '../booking/booking_flow_screen.dart';
 
 class DoctorsScreen extends StatefulWidget {
   const DoctorsScreen({super.key});
@@ -647,22 +648,64 @@ class _DoctorDetailSheet extends StatefulWidget {
 }
 
 class _DoctorDetailSheetState extends State<_DoctorDetailSheet> {
-  int _selectedDay = 0;
-  int _selectedSlot = -1;
+  int _selectedDayIndex = 0;
+  String? _selectedSlot;
+  bool _loadingSlots = true;
 
-  final _days = ['Lun 19', 'Mar 20', 'Mer 21', 'Jeu 22', 'Ven 23'];
-  final _slots = [
-    '08h00',
-    '08h30',
-    '09h00',
-    '09h30',
-    '10h00',
-    '10h30',
-    '14h00',
-    '14h30',
-    '15h00',
-    '15h30',
-  ];
+  // Prochains 7 jours (sauf dimanche si pas de créneau)
+  late final List<DateTime> _dates;
+  // slots par jour index
+  final Map<int, List<String>> _slotsByDay = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Générer les 7 prochains jours à partir d'aujourd'hui
+    final today = DateTime.now();
+    _dates = List.generate(7, (i) => today.add(Duration(days: i)));
+    _loadSlots();
+  }
+
+  Future<void> _loadSlots() async {
+    setState(() => _loadingSlots = true);
+    try {
+      final schedule = await AppServices.doctorRepository
+          .getMyScheduleForDoctor(widget.doctor.id);
+      // Mapper les créneaux par jour de la semaine (0=Lun)
+      final slotsByDow = <int, List<String>>{};
+      for (final slot in schedule.slots) {
+        if (slot.isActive) {
+          (slotsByDow[slot.dayOfWeek] ??= []).add(slot.time);
+        }
+      }
+      // Mapper sur les dates réelles
+      for (int i = 0; i < _dates.length; i++) {
+        final dow = _dates[i].weekday - 1; // weekday: 1=Lun → 0
+        final daySlots = slotsByDow[dow] ?? [];
+        daySlots.sort();
+        _slotsByDay[i] = daySlots;
+      }
+    } catch (_) {
+      // Fallback : créneaux vides — l'utilisateur verra "Aucun créneau"
+      for (int i = 0; i < _dates.length; i++) {
+        _slotsByDay[i] = [];
+      }
+    } finally {
+      if (mounted) setState(() => _loadingSlots = false);
+    }
+  }
+
+  List<String> get _currentSlots => _slotsByDay[_selectedDayIndex] ?? [];
+
+  String _dayLabel(DateTime d) {
+    const days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+    return '${days[d.weekday - 1]} ${d.day}';
+  }
+
+  bool _isToday(DateTime d) {
+    final now = DateTime.now();
+    return d.day == now.day && d.month == now.month && d.year == now.year;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -859,27 +902,26 @@ class _DoctorDetailSheetState extends State<_DoctorDetailSheet> {
                       height: 62,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
-                        itemCount: _days.length,
+                        itemCount: _dates.length,
                         itemBuilder: (_, i) {
-                          final sel = i == _selectedDay;
+                          final sel = i == _selectedDayIndex;
+                          final label = _dayLabel(_dates[i]);
+                          final isToday = _isToday(_dates[i]);
+                          final hasSlots = (_slotsByDay[i] ?? []).isNotEmpty;
                           return GestureDetector(
-                            onTap: () => setState(() => _selectedDay = i),
+                            onTap: () => setState(() {
+                              _selectedDayIndex = i;
+                              _selectedSlot = null;
+                            }),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
                               margin: const EdgeInsets.only(right: 10),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 10,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               decoration: BoxDecoration(
-                                color: sel
-                                    ? AppColors.primary
-                                    : (context.cardColor),
+                                color: sel ? AppColors.primary : context.cardColor,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: sel
-                                      ? AppColors.primary
-                                      : AppColors.border,
+                                  color: sel ? AppColors.primary : AppColors.border,
                                   width: 1.5,
                                 ),
                               ),
@@ -887,25 +929,18 @@ class _DoctorDetailSheetState extends State<_DoctorDetailSheet> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
-                                    _days[i].split(' ')[0],
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: sel
-                                          ? Colors.white70
-                                          : context.textMuted,
-                                    ),
+                                    isToday ? 'Auj.' : label.split(' ')[0],
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                                        color: sel ? Colors.white70 : context.textMuted),
                                   ),
                                   Text(
-                                    _days[i].split(' ')[1],
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                      color: sel
-                                          ? Colors.white
-                                          : context.textPrimary,
-                                    ),
+                                    label.split(' ')[1],
+                                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                                        color: sel ? Colors.white : context.textPrimary),
                                   ),
+                                  if (hasSlots && !sel)
+                                    Container(width: 4, height: 4, margin: const EdgeInsets.only(top: 2),
+                                        decoration: const BoxDecoration(color: AppColors.accent, shape: BoxShape.circle)),
                                 ],
                               ),
                             ),
@@ -919,64 +954,47 @@ class _DoctorDetailSheetState extends State<_DoctorDetailSheet> {
                     // Créneaux horaires
                     Text(
                       'Créneaux disponibles',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: context.textPrimary,
-                      ),
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary),
                     ),
                     const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: List.generate(_slots.length, (i) {
-                        final sel = i == _selectedSlot;
-                        final unavail = i == 3 || i == 7;
-                        return GestureDetector(
-                          onTap: unavail
-                              ? null
-                              : () => setState(() => _selectedSlot = i),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: unavail
-                                  ? (context.cardColor)
-                                  : sel
-                                  ? AppColors.primary
-                                  : (context.cardColor),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: unavail
-                                    ? Colors.transparent
-                                    : sel
-                                    ? AppColors.primary
-                                    : AppColors.border,
-                                width: 1.5,
+                    _loadingSlots
+                        ? const Center(child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: CircularProgressIndicator(strokeWidth: 2)))
+                        : _currentSlots.isEmpty
+                            ? Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                    color: context.cardColor, borderRadius: BorderRadius.circular(12)),
+                                child: Center(child: Column(children: [
+                                  Icon(Icons.event_busy_rounded, size: 32, color: context.textMuted),
+                                  const SizedBox(height: 8),
+                                  Text('Aucun créneau disponible ce jour',
+                                      style: TextStyle(fontSize: 13, color: context.textMuted)),
+                                ])))
+                            : Wrap(
+                                spacing: 10, runSpacing: 10,
+                                children: _currentSlots.map((slot) {
+                                  final isSel = _selectedSlot == slot;
+                                  return GestureDetector(
+                                    onTap: () => setState(() => _selectedSlot = isSel ? null : slot),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 180),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isSel ? AppColors.primary : context.cardColor,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: isSel ? AppColors.primary : AppColors.border, width: 1.5),
+                                      ),
+                                      child: Text(slot,
+                                          style: TextStyle(
+                                              fontSize: 13, fontWeight: FontWeight.w600,
+                                              color: isSel ? Colors.white : context.textPrimary)),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
-                            ),
-                            child: Text(
-                              _slots[i],
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: unavail
-                                    ? context.textMuted
-                                    : sel
-                                    ? Colors.white
-                                    : context.textPrimary,
-                                decoration: unavail
-                                    ? TextDecoration.lineThrough
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
 
                     const SizedBox(height: 32),
 
@@ -985,39 +1003,41 @@ class _DoctorDetailSheetState extends State<_DoctorDetailSheet> {
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _selectedSlot >= 0
+                        onPressed: _selectedSlot != null
                             ? () {
                                 Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'RDV confirmé avec ${doc.name} le ${_days[_selectedDay]} à ${_slots[_selectedSlot]}',
-                                    ),
-                                    backgroundColor: AppColors.success,
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
+                                // Construire la date complète
+                                final timeParts = _selectedSlot!.split(':');
+                                final bookingDate = DateTime(
+                                  _dates[_selectedDayIndex].year,
+                                  _dates[_selectedDayIndex].month,
+                                  _dates[_selectedDayIndex].day,
+                                  int.parse(timeParts[0]),
+                                  int.parse(timeParts[1]),
                                 );
+                                Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => BookingFlowScreen(
+                                    doctorId: doc.id,
+                                    doctorName: doc.name,
+                                    specialty: doc.specialty,
+                                    initials: doc.initials,
+                                    color: doc.color,
+                                    price: doc.price,
+                                    appointmentDate: bookingDate,
+                                  ),
+                                ));
                               }
                             : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           elevation: 0,
                         ),
                         child: Text(
-                          _selectedSlot >= 0
-                              ? 'Confirmer le RDV · ${_slots[_selectedSlot]}'
+                          _selectedSlot != null
+                              ? 'Confirmer le RDV · $_selectedSlot'
                               : 'Sélectionnez un créneau',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
                         ),
                       ),
                     ),
