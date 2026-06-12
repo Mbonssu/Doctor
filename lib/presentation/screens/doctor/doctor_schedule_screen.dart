@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import '../../../core/di/app_services.dart';
-import '../../../data/models/doctor_schedule/doctor_schedule_model.dart';
 
 class DoctorScheduleScreen extends StatefulWidget {
   const DoctorScheduleScreen({super.key});

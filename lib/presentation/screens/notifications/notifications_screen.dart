@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
-import '../../../core/di/app_services.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -176,14 +175,19 @@ class _Notif {
   _Notif({required this.icon, required this.color, required this.title,
     required this.body, required this.time, required this.group, this.unread = false});
 
+  // ignore: unused_element
   factory _Notif.fromApi(Map<String, dynamic> json) {
     final type = json['notif_type'] as String? ?? 'info';
     final created = DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now();
     final now = DateTime.now();
     String group;
-    if (created.day == now.day) group = "Aujourd'hui";
-    else if (created.day == now.subtract(const Duration(days: 1)).day) group = 'Hier';
-    else group = 'Cette semaine';
+    if (created.day == now.day) {
+      group = "Aujourd'hui";
+    } else if (created.day == now.subtract(const Duration(days: 1)).day) {
+      group = 'Hier';
+    } else {
+      group = 'Cette semaine';
+    }
 
     return _Notif(
       title: json['title'] as String? ?? '',

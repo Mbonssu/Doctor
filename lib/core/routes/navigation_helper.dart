@@ -82,6 +82,10 @@ class NavigationHelper {
   }
 
   // Appointments
+  static Future<void> goToAppointments(BuildContext context) {
+    return navigateTo(context, AppRoutes.appointments);
+  }
+
   static Future<void> goToAppointmentDetail(BuildContext context) {
     return navigateTo(context, AppRoutes.appointmentDetail);
   }

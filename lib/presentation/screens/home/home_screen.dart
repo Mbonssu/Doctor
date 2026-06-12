@@ -7,7 +7,6 @@ import '../../../core/di/app_services.dart';
 import '../../../data/models/appointment/appointment_model.dart';
 import '../../../data/models/doctor/doctor_model.dart';
 import '../../../data/models/doctor/doctor_list_response.dart';
-import '../booking/booking_flow_screen.dart';
 import '../health/health_screens.dart';
 import '../../widgets/shared_widgets.dart';
 import '../../widgets/glass_card.dart';

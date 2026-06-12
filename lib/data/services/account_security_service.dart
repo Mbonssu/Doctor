@@ -54,7 +54,7 @@ class AccountSecurityService extends ChangeNotifier {
   /// Retourne une map avec:
   /// - isStrong: bool
   /// - score: int (0-100)
-  /// - issues: List<String> des problèmes détectés
+  /// - issues: List&lt;String&gt; des problèmes détectés
   Map<String, dynamic> validatePasswordStrength(String password) {
     final issues = <String>[];
     var score = 0;

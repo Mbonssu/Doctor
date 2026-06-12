@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import '../../core/config/api_config.dart';
 import '../models/appointment/appointment_list_response.dart';
 import '../models/appointment/appointment_model.dart';
-import '../models/appointment/appointment_update_request.dart';
 import '../models/doctor/doctor_model.dart';
 import '../models/doctor_schedule/doctor_schedule_model.dart';
 
