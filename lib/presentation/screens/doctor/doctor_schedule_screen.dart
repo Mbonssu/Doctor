@@ -19,7 +19,6 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
   int _selectedDay = DateTime.now().weekday - 1;
   bool _isSaving = false;
   bool _isLoading = true;
-  String? _error;
 
   final _days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
@@ -42,7 +41,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
   // ─── API ────────────────────────────────────────────────────────────────────
 
   Future<void> _loadSchedule() async {
-    setState(() { _isLoading = true; _error = null; });
+    setState(() => _isLoading = true);
     try {
       final data = await AppServices.doctorRepository.getMySchedule();
 
@@ -63,7 +62,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
       }
     } catch (e) {
       // En cas d'erreur (ex: pas encore de schedule), on garde les valeurs par défaut
-      _error = null; // pas bloquant, l'utilisateur peut configurer depuis zéro
+      // chargement échoué - on garde les valeurs par défaut
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -110,6 +109,24 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
   }
 
   // ─── Actions locales ────────────────────────────────────────────────────────
+
+  List<Widget> _buildSlotGroups(List<String> slots, Set<String> booked) {
+    final morning = slots.where((s) => int.parse(s.split(':')[0]) < 13).toList();
+    final afternoon = slots.where((s) => int.parse(s.split(':')[0]) >= 13).toList();
+    return [
+      if (morning.isNotEmpty) ...[
+        _SlotGroupLabel(label: 'Matin', icon: Icons.wb_sunny_outlined, color: AppColors.warning),
+        const SizedBox(height: 8),
+        _SlotGrid(slots: morning, booked: booked, onToggle: _toggleSlot),
+        const SizedBox(height: 20),
+      ],
+      if (afternoon.isNotEmpty) ...[
+        _SlotGroupLabel(label: 'Après-midi', icon: Icons.nights_stay_outlined, color: AppColors.primary),
+        const SizedBox(height: 8),
+        _SlotGrid(slots: afternoon, booked: booked, onToggle: _toggleSlot),
+      ],
+    ];
+  }
 
   void _toggleSlot(String time) {
     if ((_bookedSlots[_selectedDay] ?? {}).contains(time)) {
@@ -379,22 +396,7 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
 
                   if (daySlots.isEmpty)
                     _EmptySlotsView(onAdd: _showAddSlotSheet)
-                  else ...[
-                    // Matin
-                    final morning = daySlots.where((s) => int.parse(s.split(':')[0]) < 13).toList();
-                    final afternoon = daySlots.where((s) => int.parse(s.split(':')[0]) >= 13).toList();
-                    if (morning.isNotEmpty) ...[
-                      _slotGroupLabel('Matin', Icons.wb_sunny_outlined, AppColors.warning),
-                      const SizedBox(height: 8),
-                      _SlotGrid(slots: morning, booked: dayBooked, onToggle: _toggleSlot),
-                      const SizedBox(height: 20),
-                    ],
-                    if (afternoon.isNotEmpty) ...[
-                      _slotGroupLabel('Après-midi', Icons.nights_stay_outlined, AppColors.primary),
-                      const SizedBox(height: 8),
-                      _SlotGrid(slots: afternoon, booked: dayBooked, onToggle: _toggleSlot),
-                    ],
-                  ],
+                  else ..._buildSlotGroups(daySlots, dayBooked),
 
                   const SizedBox(height: 24),
                   Container(
@@ -423,7 +425,15 @@ class _DoctorScheduleScreenState extends State<DoctorScheduleScreen>
     );
   }
 
-  Widget _slotGroupLabel(String label, IconData icon, Color color) =>
+}
+
+class _SlotGroupLabel extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  const _SlotGroupLabel({required this.label, required this.icon, required this.color});
+  @override
+  Widget build(BuildContext context) =>
     Row(children: [
       Icon(icon, size: 14, color: color),
       const SizedBox(width: 6),
