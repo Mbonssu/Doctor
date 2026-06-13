@@ -67,4 +67,23 @@ class DoctorsApiService {
     final body = response.data ?? <String, dynamic>{};
     return DoctorListResponse.fromJson(body);
   }
+
+  Future<List<DoctorModel>> getFavoriteDoctors() async {
+    final response = await _dio.get<List<dynamic>>(
+      ApiConfig.favoritesEndpoint,
+    );
+    final list = response.data ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map(DoctorModel.fromJson)
+        .toList();
+  }
+
+  Future<void> addFavorite(int doctorId) async {
+    await _dio.post<void>('${ApiConfig.favoritesEndpoint}/$doctorId');
+  }
+
+  Future<void> removeFavorite(int doctorId) async {
+    await _dio.delete<void>('${ApiConfig.favoritesEndpoint}/$doctorId');
+  }
 }

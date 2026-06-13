@@ -1,384 +1,279 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
+import '../../../core/di/app_services.dart';
+import '../../../data/models/doctor/doctor_model.dart';
+import '../booking/booking_flow_screen.dart';
 
 class FavoriteDoctorsScreen extends StatefulWidget {
   const FavoriteDoctorsScreen({super.key});
-
   @override
   State<FavoriteDoctorsScreen> createState() => _FavoriteDoctorsScreenState();
 }
 
 class _FavoriteDoctorsScreenState extends State<FavoriteDoctorsScreen> {
-  final List<FavoriteDoctor> _favorites = [
-    FavoriteDoctor(
-      id: '1',
-      name: 'Dr. Kouassi Jean',
-      specialty: 'Cardiologue',
-      hospital: 'CHU de Cocody',
-      rating: 4.8,
-      reviewCount: 245,
-      experience: '15 ans',
-      nextAvailable: DateTime.now().add(const Duration(days: 2)),
-      imageUrl: '',
-    ),
-    FavoriteDoctor(
-      id: '2',
-      name: 'Dr. Yao Marie',
-      specialty: 'Pédiatre',
-      hospital: 'Polyclinique Sainte Anne-Marie',
-      rating: 4.9,
-      reviewCount: 312,
-      experience: '12 ans',
-      nextAvailable: DateTime.now().add(const Duration(days: 1)),
-      imageUrl: '',
-    ),
-    FavoriteDoctor(
-      id: '3',
-      name: 'Dr. Traoré Ibrahim',
-      specialty: 'Dentiste',
-      hospital: 'Cabinet Dentaire Plateau',
-      rating: 4.7,
-      reviewCount: 189,
-      experience: '10 ans',
-      nextAvailable: DateTime.now().add(const Duration(hours: 5)),
-      imageUrl: '',
-    ),
-  ];
+  List<DoctorModel> _favorites = [];
+  bool _isLoading = true;
+  String? _error;
 
-  void _removeFavorite(String id) {
-    setState(() {
-      _favorites.removeWhere((doc) => doc.id == id);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Retiré des favoris'),
-        backgroundColor: AppColors.textMuted,
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _load();
   }
+
+  Future<void> _load() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final list = await AppServices.doctorsRepository.getFavoriteDoctors();
+      if (mounted) setState(() { _favorites = list; _isLoading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _isLoading = false; });
+    }
+  }
+
+  Future<void> _remove(DoctorModel doctor) async {
+    final name = _doctorName(doctor);
+    // Retirer localement immédiatement (optimistic update)
+    setState(() => _favorites.removeWhere((d) => d.id == doctor.id));
+    try {
+      await AppServices.doctorsRepository.removeFavorite(doctor.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('$name retiré des favoris'),
+          backgroundColor: context.isDark ? Colors.grey[800] : Colors.grey[700],
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          action: SnackBarAction(
+            label: 'Annuler', textColor: Colors.white,
+            onPressed: () async {
+              await AppServices.doctorsRepository.addFavorite(doctor.id);
+              _load();
+            },
+          ),
+        ));
+      }
+    } catch (e) {
+      // Remettre en cas d'erreur
+      if (mounted) setState(() => _favorites.insert(0, doctor));
+    }
+  }
+
+  String _doctorName(DoctorModel d) {
+    if (d.user == null) return 'Dr. #${d.id}';
+    return 'Dr. ${d.user!.firstName} ${d.user!.lastName}';
+  }
+
+  String _initials(DoctorModel d) {
+    final fn = d.user?.firstName ?? '';
+    final ln = d.user?.lastName ?? '';
+    return '${fn.isNotEmpty ? fn[0] : ''}${ln.isNotEmpty ? ln[0] : ''}'.toUpperCase();
+  }
+
+  static const _colors = [AppColors.cardio, AppColors.neuro, AppColors.pediatrie,
+    AppColors.primary, const Color(0xFF845EF7), AppColors.accent];
+  Color _color(DoctorModel d) => _colors[d.id % _colors.length];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        title: const Text('Médecins favoris'),
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
-        ),
-      ),
-      body: _favorites.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite_border_rounded,
-                    size: 80,
-                    color: context.textMutedColor,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Aucun favori',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: context.textSecondaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ajoutez vos médecins préférés\npour un accès rapide',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: context.textMutedColor,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.search_rounded),
-                    label: const Text('Trouver un médecin'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                      elevation: 0,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _favorites.length,
-              itemBuilder: (context, index) {
-                return _FavoriteDoctorCard(
-                  doctor: _favorites[index],
-                  onRemove: () => _removeFavorite(_favorites[index].id),
-                );
-              },
+      body: SafeArea(child: Column(children: [
+        // Header
+        Padding(padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+          child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Mes favoris', style: TextStyle(fontSize: 22,
+                  fontWeight: FontWeight.w800, color: context.textPrimary, letterSpacing: -0.5)),
+              if (!_isLoading && _favorites.isNotEmpty)
+                Text('${_favorites.length} médecin${_favorites.length > 1 ? 's' : ''}',
+                    style: TextStyle(fontSize: 13, color: context.textMuted)),
+            ])),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                  color: context.surfaceColor, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: context.borderColor)),
+              child: Row(children: const [
+                Icon(Icons.sort_rounded, size: 16, color: AppColors.primary),
+                SizedBox(width: 6),
+                Text('Trier', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+              ]),
             ),
+          ]),
+        ),
+
+        // Body
+        Expanded(child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? _ErrorState(onRetry: _load)
+                : _favorites.isEmpty
+                    ? _EmptyState()
+                    : RefreshIndicator(
+                        color: AppColors.primary,
+                        onRefresh: _load,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                          itemCount: _favorites.length,
+                          itemBuilder: (_, i) => _FavoriteCard(
+                            doctor: _favorites[i],
+                            name: _doctorName(_favorites[i]),
+                            initials: _initials(_favorites[i]),
+                            color: _color(_favorites[i]),
+                            onRemove: () => _remove(_favorites[i]),
+                            onBook: () => Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => BookingFlowScreen(
+                                doctorId: _favorites[i].id,
+                                doctorName: _doctorName(_favorites[i]),
+                                specialty: _favorites[i].specialty,
+                                initials: _initials(_favorites[i]),
+                                color: _color(_favorites[i]),
+                                price: '${_favorites[i].consultationFee.toInt()} FCFA',
+                              ))),
+                          ),
+                        ),
+                      ),
+        ),
+      ])),
     );
   }
 }
 
-class _FavoriteDoctorCard extends StatelessWidget {
-  final FavoriteDoctor doctor;
-  final VoidCallback onRemove;
+// ── FAVORITE CARD ─────────────────────────────────────────────
 
-  const _FavoriteDoctorCard({
-    required this.doctor,
-    required this.onRemove,
-  });
+class _FavoriteCard extends StatelessWidget {
+  final DoctorModel doctor;
+  final String name, initials;
+  final Color color;
+  final VoidCallback onRemove, onBook;
+
+  const _FavoriteCard({required this.doctor, required this.name,
+    required this.initials, required this.color,
+    required this.onRemove, required this.onBook});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: context.surfaceColor,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.borderColor, width: 1),
+        color: context.surfaceColor, borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.borderColor),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8, offset: const Offset(0, 2))],
       ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Avatar
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Text(
-                      doctor.name.substring(4, 5).toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 14),
-
-                // Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              doctor.name,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: context.textPrimary,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: onRemove,
-                            icon: const Icon(
-                              Icons.favorite_rounded,
-                              color: AppColors.danger,
-                              size: 22,
-                            ),
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        doctor.specialty,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 14,
-                            color: context.textMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              doctor.hospital,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textMuted,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star_rounded,
-                            size: 14,
-                            color: AppColors.warning,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${doctor.rating}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: context.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            ' (${doctor.reviewCount} avis)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textMuted,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: context.primaryLightColor,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              doctor.experience,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Disponibilité
-          Container(
-            padding: const EdgeInsets.all(12),
+      child: Column(children: [
+        Padding(padding: const EdgeInsets.all(16), child: Row(children: [
+          // Avatar
+          Container(width: 58, height: 58,
             decoration: BoxDecoration(
-              color: AppColors.success.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(18),
-                bottomRight: Radius.circular(18),
+              color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5)),
+            child: Center(child: Text(initials,
+                style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 18)))),
+          const SizedBox(width: 14),
+          // Info
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: context.textPrimary)),
+            const SizedBox(height: 3),
+            Row(children: [
+              Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5)),
+                child: Text(doctor.specialty, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color))),
+              const SizedBox(width: 6),
+              if (doctor.city != null)
+                Flexible(child: Text(doctor.city!, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 10, color: context.textMuted))),
+            ]),
+            const SizedBox(height: 6),
+            Row(children: [
+              const Icon(Icons.star_rounded, color: AppColors.warning, size: 13),
+              const SizedBox(width: 3),
+              Text('${doctor.rating}',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.textPrimary)),
+              Text(' · ${doctor.totalReviews} avis',
+                  style: TextStyle(fontSize: 11, color: context.textMuted)),
+              const Spacer(),
+              Text('${doctor.consultationFee.toInt()} FCFA',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            ]),
+          ])),
+          // Retirer des favoris
+          GestureDetector(
+            onTap: onRemove,
+            child: Container(width: 36, height: 36, margin: const EdgeInsets.only(left: 8),
+              decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.danger.withValues(alpha: 0.2))),
+              child: const Icon(Icons.favorite_rounded, color: AppColors.danger, size: 18)),
+          ),
+        ])),
+
+        // Disponibilité + bouton
+        Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: context.bgColor, borderRadius: BorderRadius.circular(12)),
+          child: Row(children: [
+            Container(width: 8, height: 8,
+                decoration: BoxDecoration(shape: BoxShape.circle,
+                    color: doctor.isAvailable ? AppColors.success : AppColors.danger)),
+            const SizedBox(width: 8),
+            Text(doctor.isAvailable ? 'Disponible maintenant' : 'Complet pour le moment',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                    color: doctor.isAvailable ? AppColors.success : AppColors.danger)),
+            const Spacer(),
+            GestureDetector(
+              onTap: doctor.isAvailable ? onBook : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: doctor.isAvailable ? AppColors.primary : context.borderColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('Prendre RDV',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                        color: doctor.isAvailable ? Colors.white : context.textMuted)),
               ),
             ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.access_time_rounded,
-                  size: 16,
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Disponible ${_formatAvailability(doctor.nextAvailable)}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.success,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 6,
-                    ),
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: const Text(
-                    'Prendre RDV',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+          ]),
+        ),
+      ]),
     );
-  }
-
-  String _formatAvailability(DateTime date) {
-    final now = DateTime.now();
-    final diff = date.difference(now);
-
-    if (diff.inHours < 24) {
-      return 'aujourd\'hui';
-    } else if (diff.inDays == 1) {
-      return 'demain';
-    } else if (diff.inDays < 7) {
-      return 'dans ${diff.inDays} jours';
-    } else {
-      return 'le ${date.day}/${date.month}';
-    }
   }
 }
 
-class FavoriteDoctor {
-  final String id;
-  final String name;
-  final String specialty;
-  final String hospital;
-  final double rating;
-  final int reviewCount;
-  final String experience;
-  final DateTime nextAvailable;
-  final String imageUrl;
+// ── STATES ────────────────────────────────────────────────────
 
-  FavoriteDoctor({
-    required this.id,
-    required this.name,
-    required this.specialty,
-    required this.hospital,
-    required this.rating,
-    required this.reviewCount,
-    required this.experience,
-    required this.nextAvailable,
-    required this.imageUrl,
-  });
+class _EmptyState extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Center(child: Column(
+    mainAxisAlignment: MainAxisAlignment.center, children: [
+    Container(width: 80, height: 80,
+        decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.08), shape: BoxShape.circle),
+        child: const Icon(Icons.favorite_border_rounded, size: 36, color: AppColors.danger)),
+    const SizedBox(height: 16),
+    Text('Aucun favori', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.textPrimary)),
+    const SizedBox(height: 6),
+    Text('Ajoutez des médecins à vos favoris\npour les retrouver ici rapidement.',
+        textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: context.textMuted, height: 1.5)),
+  ]));
+}
+
+class _ErrorState extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorState({required this.onRetry});
+  @override
+  Widget build(BuildContext context) => Center(child: Column(
+    mainAxisAlignment: MainAxisAlignment.center, children: [
+    Icon(Icons.wifi_off_rounded, size: 56, color: context.textMuted),
+    const SizedBox(height: 12),
+    Text('Impossible de charger', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: context.textPrimary)),
+    const SizedBox(height: 20),
+    ElevatedButton.icon(onPressed: onRetry,
+        icon: const Icon(Icons.refresh_rounded), label: const Text('Réessayer'),
+        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+  ]));
 }

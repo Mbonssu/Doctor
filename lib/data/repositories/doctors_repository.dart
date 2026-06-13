@@ -50,4 +50,13 @@ class DoctorsRepository extends BaseRepository {
       ),
     );
   }
+
+  Future<List<DoctorModel>> getFavoriteDoctors() =>
+      run(() => _apiService.getFavoriteDoctors());
+
+  Future<void> addFavorite(int doctorId) =>
+      run(() => _apiService.addFavorite(doctorId));
+
+  Future<void> removeFavorite(int doctorId) =>
+      run(() => _apiService.removeFavorite(doctorId));
 }

@@ -24,13 +24,10 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
   final _formKey = GlobalKey<FormState>();
 
   // TODO: charger depuis AppServices.authSessionManager.user et DoctorService
-  static const _mockLicense = 'CM-MED-2024-00342';
-  static const _mockClinic = 'Clinique Ngousso, Yaoundé';
-  static const _mockCity = 'Yaoundé';
-  static const _mockSpecialty = 'Cardiologie';
-  static const _mockExperience = '12';
-  static const _mockBio =
-      'Cardiologue spécialisé en chirurgie coronarienne. Diplômé de la Faculté de Médecine de Yaoundé. Expérience en cardiologie interventionnelle.';
+
+  // Chargement réel depuis l'API
+  bool _isLoadingProfile = true;
+  late final TextEditingController _licenseCtrl;
 
   @override
   bool get wantKeepAlive => true;
@@ -38,11 +35,30 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
   @override
   void initState() {
     super.initState();
-    _specialtyCtrl = TextEditingController(text: _mockSpecialty);
-    _experienceCtrl = TextEditingController(text: _mockExperience);
-    _bioCtrl = TextEditingController(text: _mockBio);
-    _clinicCtrl = TextEditingController(text: _mockClinic);
-    _cityCtrl = TextEditingController(text: _mockCity);
+    _specialtyCtrl  = TextEditingController();
+    _experienceCtrl = TextEditingController();
+    _bioCtrl        = TextEditingController();
+    _clinicCtrl     = TextEditingController();
+    _cityCtrl       = TextEditingController();
+    _licenseCtrl    = TextEditingController();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final doctor = await AppServices.doctorRepository.getMyProfile();
+      if (!mounted) return;
+      _specialtyCtrl.text  = doctor.specialty;
+      _experienceCtrl.text = '${doctor.yearsOfExperience}';
+      _bioCtrl.text        = doctor.bio ?? '';
+      _clinicCtrl.text     = doctor.hospitalName ?? '';
+      _cityCtrl.text       = doctor.city ?? '';
+      _licenseCtrl.text    = doctor.licenseNumber;
+    } catch (_) {
+      // Garder les champs vides — l'utilisateur les remplit manuellement
+    } finally {
+      if (mounted) setState(() => _isLoadingProfile = false);
+    }
   }
 
   @override
@@ -52,12 +68,16 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
     _experienceCtrl.dispose();
     _clinicCtrl.dispose();
     _cityCtrl.dispose();
+    _licenseCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (_isLoadingProfile) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final user = AppServices.authSessionManager.user;
     final fullName = user?.fullName ?? 'Dr. Médecin';
     final initial = user?.firstName.isNotEmpty == true ? user!.firstName[0] : 'D';
@@ -149,7 +169,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
                   children: [
                     _InfoRow(
                       label: 'Numéro de licence',
-                      value: _mockLicense,
+                      value: _licenseCtrl.text.isNotEmpty ? _licenseCtrl.text : 'Non renseigné',
                     ),
                   ],
                 ),
@@ -223,25 +243,30 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
     try {
-      // TODO: appel API save profile
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
-      setState(() {
-        _isEditing = false;
-        _isLoading = false;
+      await AppServices.doctorRepository.updateMyProfile({
+        'specialty': _specialtyCtrl.text.trim(),
+        'years_of_experience': int.tryParse(_experienceCtrl.text) ?? 0,
+        'bio': _bioCtrl.text.trim(),
+        'hospital_name': _clinicCtrl.text.trim(),
+        'city': _cityCtrl.text.trim(),
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Profil mis à jour'),
-          backgroundColor: AppColors.success,
+      if (!mounted) return;
+      setState(() { _isEditing = false; _isLoading = false; });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Profil mis à jour'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+        ));
+      }
     }
   }
 
