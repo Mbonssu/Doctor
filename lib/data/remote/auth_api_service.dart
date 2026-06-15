@@ -47,4 +47,44 @@ class AuthApiService {
       data: {'access_token': accessToken, 'refresh_token': refreshToken},
     );
   }
+
+  Future<void> forgotPassword(String email) async {
+    await _dio.post<Map<String, dynamic>>(
+      ApiConfig.forgotPasswordEndpoint,
+      data: {'email': email.trim().toLowerCase()},
+    );
+  }
+
+  Future<void> verifyResetCode({required String email, required String code}) async {
+    await _dio.post<Map<String, dynamic>>(
+      '\${ApiConfig.resetPasswordEndpoint}/verify',
+      data: {'email': email.trim().toLowerCase(), 'code': code},
+    );
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      ApiConfig.resetPasswordEndpoint,
+      data: {'email': email.trim().toLowerCase(), 'code': code, 'new_password': newPassword},
+    );
+  }
+
+  Future<void> verifyEmail({required String email, required String code}) async {
+    await _dio.post<Map<String, dynamic>>(
+      ApiConfig.verifyEmailEndpoint,
+      data: {'email': email.trim().toLowerCase(), 'code': code},
+    );
+  }
+
+  Future<void> resendVerificationCode(String email) async {
+    await _dio.post<Map<String, dynamic>>(
+      '\${ApiConfig.verifyEmailEndpoint}/resend',
+      data: {'email': email.trim().toLowerCase()},
+    );
+  }
+
 }

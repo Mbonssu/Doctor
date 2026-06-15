@@ -28,6 +28,9 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
   // Chargement réel depuis l'API
   bool _isLoadingProfile = true;
   late final TextEditingController _licenseCtrl;
+  int _totalPatients = 0;
+  int _appointmentsThisMonth = 0;
+  double _avgRating = 0.0;
 
   @override
   bool get wantKeepAlive => true;
@@ -55,10 +58,18 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
       _cityCtrl.text       = doctor.city ?? '';
       _licenseCtrl.text    = doctor.licenseNumber;
     } catch (_) {
-      // Garder les champs vides — l'utilisateur les remplit manuellement
-    } finally {
-      if (mounted) setState(() => _isLoadingProfile = false);
+      // Garder les champs vides si API indisponible
     }
+    // Charger les stats séparément (non bloquant)
+    try {
+      final stats = await AppServices.doctorRepository.getMyStats();
+      if (mounted) setState(() {
+        _totalPatients = stats['total_patients'] as int? ?? 0;
+        _appointmentsThisMonth = stats['appointments_this_month'] as int? ?? 0;
+        _avgRating = (stats['average_rating'] as num?)?.toDouble() ?? 0.0;
+      });
+    } catch (_) {/* stats optionnelles */}
+    if (mounted) setState(() => _isLoadingProfile = false);
   }
 
   @override
@@ -104,7 +115,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen>
               const SizedBox(height: 24),
               // ─── Stats ─────────────────────────────────────────────────
               if (!_isEditing)
-                _StatsRow(),
+                _StatsRow(totalPatients: _totalPatients, appointmentsThisMonth: _appointmentsThisMonth, avgRating: _avgRating),
               if (!_isEditing) const SizedBox(height: 24),
               // ─── Professional info ────────────────────────────────────
               _SectionCard(
@@ -467,15 +478,19 @@ class _ProfileHeroCard extends StatelessWidget {
 // ─── Stats row ────────────────────────────────────────────────────────────────
 
 class _StatsRow extends StatelessWidget {
+  final int totalPatients;
+  final int appointmentsThisMonth;
+  final double avgRating;
+  const _StatsRow({required this.totalPatients, required this.appointmentsThisMonth, required this.avgRating});
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _StatBox(value: '324', label: 'Patients', color: AppColors.primary),
+        _StatBox(value: '$totalPatients', label: 'Patients', color: AppColors.primary),
         const SizedBox(width: 10),
-        _StatBox(value: '156', label: 'RDV/mois', color: AppColors.accent),
+        _StatBox(value: '$appointmentsThisMonth', label: 'RDV/mois', color: AppColors.accent),
         const SizedBox(width: 10),
-        _StatBox(value: '4.8★', label: 'Note', color: AppColors.warning),
+        _StatBox(value: avgRating > 0 ? '${avgRating.toStringAsFixed(1)}★' : '—', label: 'Note', color: AppColors.warning),
       ],
     );
   }

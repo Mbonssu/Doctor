@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
+import '../../../core/di/app_services.dart';
+import '../../../core/network/api_exception.dart';
 import 'login_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
@@ -38,27 +40,58 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   Future<void> _handleVerifyCode() async {
     final code = _codeControllers.map((c) => c.text).join();
-    if (code.length != 6) {
-      _showError('Veuillez entrer le code complet');
-      return;
-    }
+    if (code.length != 6) { _showError('Veuillez entrer le code complet'); return; }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-        _codeVerified = true;
-      });
+    try {
+      await AppServices.authRepository.verifyResetCode(email: widget.email, code: code);
+      if (!mounted) return;
+      setState(() { _isLoading = false; _codeVerified = true; });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError(e.displayMessage);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError('Code invalide ou expiré');
     }
   }
 
   Future<void> _handleResetPassword() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
+    try {
+      final code = _codeControllers.map((c) => c.text).join();
+      await AppServices.authRepository.resetPassword(
+        email: widget.email, code: code, newPassword: _passwordController.text,
+      );
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showSuccessDialog();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError(e.displayMessage);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError('Erreur lors de la réinitialisation');
+    }
+  }
+
+  Future<void> _handleResendCode() async {
+    try {
+      await AppServices.authRepository.forgotPassword(widget.email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Code renvoyé avec succès'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } on ApiException catch (e) {
+      if (mounted) _showError(e.displayMessage);
+    } catch (_) {
+      if (mounted) _showError('Impossible de renvoyer le code');
     }
   }
 
@@ -316,7 +349,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
         // Renvoyer le code
         TextButton(
-          onPressed: () {},
+          onPressed: _handleResendCode,
           child: const Text(
             'Renvoyer le code',
             style: TextStyle(

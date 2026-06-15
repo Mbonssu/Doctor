@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
+import '../../../core/di/app_services.dart';
+import '../../../core/network/api_exception.dart';
 import '../home/main_navigation.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
@@ -46,37 +48,48 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
   Future<void> _handleVerify() async {
     final code = _codeControllers.map((c) => c.text).join();
-    if (code.length != 6) {
-      _showError('Veuillez entrer le code complet');
-      return;
-    }
+    if (code.length != 6) { _showError('Veuillez entrer le code complet'); return; }
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
+    try {
+      await AppServices.authRepository.verifyEmail(email: widget.email, code: code);
+      if (!mounted) return;
       setState(() => _isLoading = false);
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const MainNavigation()),
         (route) => false,
       );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError(e.displayMessage);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError('Code invalide ou expiré');
     }
   }
 
   Future<void> _handleResend() async {
     if (_resendCountdown > 0) return;
-    setState(() {
-      _resendCountdown = 60;
-      _isLoading = true;
-    });
-    await Future.delayed(const Duration(seconds: 1));
-    if (mounted) {
+    setState(() { _resendCountdown = 60; _isLoading = true; });
+    try {
+      await AppServices.authRepository.resendVerificationCode(widget.email);
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _startCountdown();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Code renvoyé avec succès'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Code renvoyé avec succès'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _isLoading = false; _resendCountdown = 0; });
+      _showError(e.displayMessage);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _isLoading = false; _resendCountdown = 0; });
+      _showError('Impossible de renvoyer le code');
     }
   }
 

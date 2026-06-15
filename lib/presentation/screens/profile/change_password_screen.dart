@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../core/di/app_services.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 
@@ -30,13 +32,32 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   Future<void> _handleChangePassword() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
+    try {
+      await AppServices.accountSecurityService.changePassword(
+        currentPassword: _currentPasswordController.text,
+        newPassword: _newPasswordController.text,
+      );
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _showSuccessDialog();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.displayMessage),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erreur lors du changement de mot de passe'),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 

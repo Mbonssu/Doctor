@@ -146,4 +146,24 @@ class AuthRepository extends BaseRepository {
 
     return null;
   }
+
+  Future<void> forgotPassword(String email) =>
+      run(() => _apiService.forgotPassword(email));
+
+  Future<void> verifyResetCode({required String email, required String code}) =>
+      run(() => _apiService.verifyResetCode(email: email, code: code));
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) =>
+      run(() => _apiService.resetPassword(email: email, code: code, newPassword: newPassword));
+
+  Future<void> verifyEmail({required String email, required String code}) =>
+      run(() => _apiService.verifyEmail(email: email, code: code));
+
+  Future<void> resendVerificationCode(String email) =>
+      run(() => _apiService.resendVerificationCode(email));
+
 }

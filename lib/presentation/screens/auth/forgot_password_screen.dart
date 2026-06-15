@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
+import '../../../core/di/app_services.dart';
+import '../../../core/network/api_exception.dart';
 import 'reset_password_screen.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -24,14 +26,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _handleSendCode() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
+    try {
+      await AppServices.authRepository.forgotPassword(_emailController.text.trim());
+      if (!mounted) return;
       setState(() => _isLoading = false);
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ResetPasswordScreen(email: _emailController.text),
-        ),
-      );
+      Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ResetPasswordScreen(email: _emailController.text.trim()),
+      ));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(e.displayMessage),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Erreur réseau. Vérifiez votre connexion.'),
+        backgroundColor: AppColors.danger,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 

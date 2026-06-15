@@ -4,39 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import '../../../core/di/app_services.dart';
 import '../../../core/network/api_exception.dart';
-
-// ─── Modèles légers (à migrer dans data/models quand l'API est prête) ────────
-
-class _DoctorStats {
-  final int appointmentsToday;
-  final int totalPatients;
-  final String monthlyRevenue;
-  final double avgRating;
-
-  const _DoctorStats({
-    required this.appointmentsToday,
-    required this.totalPatients,
-    required this.monthlyRevenue,
-    required this.avgRating,
-  });
-}
-
-class _UpcomingAppointment {
-  final String patientName;
-  final String patientInitial;
-  final String time;
-  final String type;
-  final AppointmentStatus status;
-
-   _UpcomingAppointment({
-    required this.patientName,
-    required this.time,
-    required this.type,
-    required this.status,
-  }) : patientInitial = patientName.isEmpty ? '?' : patientName[0];
-}
-
-enum AppointmentStatus { pending, confirmed, completed }
+import '../../../data/models/appointment/appointment_model.dart';
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
@@ -51,8 +19,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
     with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
   String? _errorMessage;
-  _DoctorStats? _stats;
-  List<_UpcomingAppointment> _upcoming = [];
+  Map<String, dynamic> _stats = {};
+  List<AppointmentModel> _upcoming = [];
 
   @override
   bool get wantKeepAlive => true;
@@ -64,53 +32,30 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() { _isLoading = true; _errorMessage = null; });
     try {
       final user = AppServices.authSessionManager.user;
-      if (user == null) throw ApiException(message: "Utilisateur non trouvé");
+      if (user == null) throw ApiException(message: 'Session expirée');
 
-      // TODO: remplacer par un vrai appel DoctorService
-      await Future.delayed(const Duration(milliseconds: 600));
+      // Charger stats + RDV à venir en parallèle
+      final results = await Future.wait([
+        AppServices.doctorRepository.getMyStats(),
+        AppServices.doctorRepository.getMyAppointments(status: 'confirmed', pageSize: 5),
+      ]);
 
       if (!mounted) return;
       setState(() {
-        _stats = const _DoctorStats(
-          appointmentsToday: 8,
-          totalPatients: 324,
-          monthlyRevenue: '2.4M',
-          avgRating: 4.8,
-        );
-        _upcoming = [
-          _UpcomingAppointment(
-            patientName: 'Jean Kouassi',
-            time: '09:30',
-            type: 'Consultation générale',
-            status: AppointmentStatus.confirmed,
-          ),
-          _UpcomingAppointment(
-            patientName: 'Marie Traoré',
-            time: '11:00',
-            type: 'Suivi cardiaque',
-            status: AppointmentStatus.pending,
-          ),
-          _UpcomingAppointment(
-            patientName: 'Pierre Yao',
-            time: '14:30',
-            type: 'Visite post-opératoire',
-            status: AppointmentStatus.confirmed,
-          ),
-        ];
+        _stats   = results[0] as Map<String, dynamic>;
+        final apptResp = results[1] as dynamic;
+        _upcoming = apptResp.appointments as List<AppointmentModel>;
         _isLoading = false;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message;
-        _isLoading = false;
-      });
+      setState(() { _errorMessage = e.displayMessage; _isLoading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _errorMessage = 'Erreur de connexion'; _isLoading = false; });
     }
   }
 
@@ -151,7 +96,7 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
                 sliver: SliverToBoxAdapter(
-                  child: _StatsGrid(stats: _stats!),
+                  child: _StatsGrid(stats: _stats, upcoming: _upcoming),
                 ),
               ),
 
@@ -168,8 +113,8 @@ class _DoctorDashboardScreenState extends State<DoctorDashboardScreen>
                 padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
                 sliver: SliverToBoxAdapter(
                   child: _SectionHeader(
-                    title: 'Rendez-vous du jour',
-                    subtitle: '${_upcoming.length} à venir',
+                    title: 'Rendez-vous à venir',
+                    subtitle: '${_upcoming.length} planifié(s)',
                     onSeeAll: () {},
                   ),
                 ),
@@ -308,43 +253,50 @@ class _DashboardHeader extends StatelessWidget {
 // ─── Stats grid ──────────────────────────────────────────────────────────────
 
 class _StatsGrid extends StatelessWidget {
-  final _DoctorStats stats;
+  final Map<String, dynamic> stats;
+  final List<AppointmentModel> upcoming;
 
-  const _StatsGrid({required this.stats});
+  const _StatsGrid({required this.stats, required this.upcoming});
 
   @override
   Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final todayCount = upcoming.where((a) =>
+        a.appointmentDate.year == today.year &&
+        a.appointmentDate.month == today.month &&
+        a.appointmentDate.day == today.day).length;
+
     final items = [
       _StatData(
         label: 'RDV du jour',
-        value: '${stats.appointmentsToday}',
+        value: '$todayCount',
         icon: Icons.calendar_today_rounded,
         color: AppColors.primary,
-        trend: '+2 vs hier',
+        trend: 'aujourd\'hui',
         trendPositive: true,
       ),
       _StatData(
         label: 'Patients',
-        value: '${stats.totalPatients}',
+        value: '${stats['total_patients'] ?? upcoming.length}',
         icon: Icons.people_outline_rounded,
         color: AppColors.accent,
-        trend: '+12 ce mois',
+        trend: 'total',
         trendPositive: true,
       ),
       _StatData(
-        label: 'Revenus (mois)',
-        value: stats.monthlyRevenue,
+        label: 'RDV ce mois',
+        value: '${stats['appointments_this_month'] ?? upcoming.length}',
         icon: Icons.trending_up_rounded,
         color: AppColors.warning,
-        trend: 'FCFA',
+        trend: 'ce mois',
         trendPositive: true,
       ),
       _StatData(
         label: 'Note moy.',
-        value: '${stats.avgRating}',
+        value: '${stats['average_rating'] ?? '—'}',
         icon: Icons.star_rounded,
         color: AppColors.cardio,
-        trend: '234 avis',
+        trend: '${stats['total_reviews'] ?? 0} avis',
         trendPositive: true,
       ),
     ];
@@ -652,122 +604,60 @@ class _SectionHeader extends StatelessWidget {
 // ─── Appointment card ─────────────────────────────────────────────────────────
 
 class _AppointmentCard extends StatelessWidget {
-  final _UpcomingAppointment appointment;
-
+  final AppointmentModel appointment;
   const _AppointmentCard({required this.appointment});
 
   @override
   Widget build(BuildContext context) {
     final statusColor = switch (appointment.status) {
-      AppointmentStatus.confirmed => AppColors.success,
-      AppointmentStatus.pending => AppColors.warning,
-      AppointmentStatus.completed => AppColors.primary,
+      'confirmed' => AppColors.success,
+      'pending'   => AppColors.warning,
+      'completed' => AppColors.primary,
+      _           => context.mutedText,
     };
     final statusLabel = switch (appointment.status) {
-      AppointmentStatus.confirmed => 'Confirmé',
-      AppointmentStatus.pending => 'En attente',
-      AppointmentStatus.completed => 'Complété',
+      'confirmed' => 'Confirmé',
+      'pending'   => 'En attente',
+      'completed' => 'Complété',
+      _           => appointment.status,
     };
+    final name    = appointment.patient?.fullName ?? 'Patient';
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final time    = '\${appointment.appointmentDate.hour.toString().padLeft(2,'0')}h\${appointment.appointmentDate.minute.toString().padLeft(2,'0')}';
 
     return Container(
       decoration: BoxDecoration(
         color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.dividerColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: context.isDark ? 0.2 : 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: context.isDark ? 0.2 : 0.04), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          // Avatar with gradient
+      child: Row(children: [
+        Container(
+          width: 46, height: 46,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.7), AppColors.primary], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Center(child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 18))),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: context.textColor, letterSpacing: -0.1)),
+          const SizedBox(height: 2),
+          Text(appointment.reason ?? appointment.appointmentType, style: TextStyle(fontSize: 12, color: context.mutedText)),
+        ])),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(time, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.primary, letterSpacing: -0.2)),
+          const SizedBox(height: 4),
           Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withValues(alpha: 0.7),
-                  AppColors.primary,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(
-              child: Text(
-                appointment.patientInitial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+            child: Text(statusLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: statusColor)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  appointment.patientName,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: context.textColor,
-                    letterSpacing: -0.1,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  appointment.type,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: context.mutedText,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                appointment.time,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  statusLabel,
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        ]),
+      ]),
     );
   }
 }
