@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/di/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 
@@ -69,7 +70,11 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen>
                   ),
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: Row(
+                child: Builder(builder: (context) {
+                  final user = AppServices.authSessionManager.user;
+                  final fullName = user?.fullName ?? 'Patient';
+                  final initials = '${(user?.firstName.isNotEmpty == true ? user!.firstName[0] : 'P')}${(user?.lastName.isNotEmpty == true ? user!.lastName[0] : '')}'.toUpperCase();
+                  return Row(
                   children: [
                     Container(
                       width: 52, height: 52,
@@ -77,24 +82,22 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen>
                         gradient: const LinearGradient(colors: [AppColors.primary, AppColors.accent]),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: const Center(child: Text('JD',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
+                      child: Center(child: Text(initials,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18))),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Jean Dupont',
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
+                          Text(fullName,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
                           const SizedBox(height: 3),
-                          Text('Né le 15/03/1990 · 35 ans · O+',
+                          Text('Patient DoctoPing',
                               style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 12)),
                           const SizedBox(height: 6),
                           Row(children: [
-                            _MiniTag(label: 'HTA légère', color: AppColors.warning),
-                            const SizedBox(width: 6),
-                            _MiniTag(label: 'Allergie: Pénicilline', color: AppColors.danger),
+                            _MiniTag(label: 'Dossier actif', color: AppColors.success),
                           ]),
                         ],
                       ),
@@ -109,7 +112,8 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen>
                       child: const Icon(Icons.qr_code_rounded, color: Colors.white, size: 22),
                     ),
                   ],
-                ),
+                );
+                }),
               ),
             ),
 
@@ -165,7 +169,7 @@ class _SummaryTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () async => await Future.delayed(const Duration(seconds: 1)),
+      onRefresh: () async { setState(() {}); },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [

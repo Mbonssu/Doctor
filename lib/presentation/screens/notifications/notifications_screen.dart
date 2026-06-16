@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../core/di/app_services.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/models/appointment/appointment_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 
@@ -22,12 +25,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _load() async {
     setState(() { _isLoading = true; _hasError = false; });
     try {
-      // TODO: brancher sur AppServices.notificationsRepository quand il sera créé
-      // Pour l'instant on charge le compte non-lu depuis l'API existante
-      // et on affiche des notifications structurées
-      await Future.delayed(const Duration(milliseconds: 300));
-      // Placeholder — sera remplacé par appel API réel
-      setState(() { _notifs = []; });
+      // Charger RDV récents depuis l'API pour construire les notifications
+      final results = await Future.wait([
+        AppServices.appointmentsRepository.getMyAppointments(status: 'confirmed', pageSize: 10),
+        AppServices.appointmentsRepository.getMyAppointments(status: 'pending', pageSize: 10),
+        AppServices.appointmentsRepository.getMyAppointments(status: 'cancelled', pageSize: 5),
+      ]);
+
+      if (!mounted) return;
+      final notifs = <_Notif>[];
+
+      // RDV confirmés → notification "Confirmé"
+      for (final apt in (results[0].appointments)) {
+        notifs.add(_Notif.fromAppointment(apt, 'confirmed'));
+      }
+      // RDV en attente → notification "En attente"
+      for (final apt in (results[1].appointments)) {
+        notifs.add(_Notif.fromAppointment(apt, 'pending'));
+      }
+      // RDV annulés → notification "Annulé"
+      for (final apt in (results[2].appointments)) {
+        notifs.add(_Notif.fromAppointment(apt, 'cancelled'));
+      }
+
+      // Trier par date décroissante
+      notifs.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+
+      setState(() { _notifs = notifs; });
+    } on ApiException catch (_) {
+      setState(() => _hasError = true);
     } catch (_) {
       setState(() => _hasError = true);
     } finally {
@@ -170,33 +196,96 @@ class _Notif {
   final IconData icon;
   final Color color;
   final String title, body, time, group;
+  final DateTime dateTime;
   bool unread;
 
-  _Notif({required this.icon, required this.color, required this.title,
-    required this.body, required this.time, required this.group, this.unread = false});
+  _Notif({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+    required this.time,
+    required this.group,
+    required this.dateTime,
+    this.unread = false,
+  });
 
-  // ignore: unused_element
+  factory _Notif.fromAppointment(AppointmentModel apt, String status) {
+    final dt      = apt.appointmentDate;
+    final now     = DateTime.now();
+    final docName = apt.doctor?.user?.fullName ?? 'Médecin';
+    final timeStr = '${dt.hour.toString().padLeft(2,'0')}h${dt.minute.toString().padLeft(2,'0')}';
+    final dateStr = '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year}';
+
+    String title, body;
+    IconData icon;
+    Color color;
+    bool unread;
+
+    switch (status) {
+      case 'confirmed':
+        title = 'RDV confirmé';
+        body  = 'Dr. $docName — $dateStr à $timeStr';
+        icon  = Icons.check_circle_rounded;
+        color = AppColors.success;
+        unread = dt.isAfter(now.subtract(const Duration(days: 1)));
+      case 'pending':
+        title = 'RDV en attente';
+        body  = 'En attente de confirmation — $dateStr à $timeStr';
+        icon  = Icons.schedule_rounded;
+        color = AppColors.warning;
+        unread = true;
+      case 'cancelled':
+        title = 'RDV annulé';
+        body  = 'Dr. $docName — $dateStr';
+        icon  = Icons.cancel_rounded;
+        color = AppColors.danger;
+        unread = false;
+      default:
+        title = 'Rendez-vous';
+        body  = 'Dr. $docName — $dateStr';
+        icon  = Icons.calendar_month_rounded;
+        color = AppColors.primary;
+        unread = false;
+    }
+
+    final diff = now.difference(dt).abs();
+    String group;
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      group = "Aujourd'hui";
+    } else if (diff.inDays == 1) {
+      group = 'Hier';
+    } else if (diff.inDays <= 7) {
+      group = 'Cette semaine';
+    } else {
+      group = 'Plus ancien';
+    }
+
+    return _Notif(
+      icon: icon, color: color, title: title, body: body,
+      time: _formatTime(dt), group: group, dateTime: dt, unread: unread,
+    );
+  }
+
+  // Conservé pour compatibilité API future
   factory _Notif.fromApi(Map<String, dynamic> json) {
-    final type = json['notif_type'] as String? ?? 'info';
+    final type    = json['notif_type'] as String? ?? 'info';
     final created = DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now();
-    final now = DateTime.now();
+    final now     = DateTime.now();
     String group;
     if (created.day == now.day) {
       group = "Aujourd'hui";
-    } else if (created.day == now.subtract(const Duration(days: 1)).day) {
+    } else if (created.difference(now).abs().inDays == 1) {
       group = 'Hier';
     } else {
       group = 'Cette semaine';
     }
-
     return _Notif(
       title: json['title'] as String? ?? '',
       body: json['message'] as String? ?? '',
-      time: _formatTime(created),
-      group: group,
+      time: _formatTime(created), group: group, dateTime: created,
       unread: !(json['is_read'] as bool? ?? false),
-      icon: _iconFor(type),
-      color: _colorFor(type),
+      icon: _iconFor(type), color: _colorFor(type),
     );
   }
 
