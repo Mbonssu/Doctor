@@ -206,7 +206,7 @@ class _SummaryTab extends StatelessWidget {
           const SizedBox(height: 24),
           _SectionLabel('Traitements en cours'),
           const SizedBox(height: 12),
-          _TreatmentTile(name: 'Amlodipine 5mg', frequency: '1x / jour', since: 'Jan 2023', doctor: 'Dr. Toure'),
+          _TreatmentTile(name: 'Amlodipine 5mg', frequency: '1x / jour', since: 'Jan 2023', doctor: 'Médecin traitant'),
         ],
       ),
     );
@@ -215,10 +215,10 @@ class _SummaryTab extends StatelessWidget {
 
 class _PrescriptionsTab extends StatelessWidget {
   final _prescriptions = const [
-    _PrescData('Ordonnance — Cardiologie', 'Dr. Amine Toure', '15 Avril 2025', '3 médicaments', true),
-    _PrescData('Ordonnance — Ophtalmologie', 'Dr. Cécile Fon', '8 Avril 2025', '1 médicament', true),
-    _PrescData('Ordonnance — Généraliste', 'Dr. Samuel Nkama', '22 Mars 2025', '2 médicaments', false),
-    _PrescData('Ordonnance — Cardiologie', 'Dr. Amine Toure', '10 Jan 2025', '2 médicaments', false),
+    _PrescData('Ordonnance — Cardiologie', 'Médecin traitant', '15 Avril 2025', '3 médicaments', true),
+    _PrescData('Ordonnance — Ophtalmologie', 'Médecin consulté', '8 Avril 2025', '1 médicament', true),
+    _PrescData('Ordonnance — Généraliste', 'Médecin consulté', '22 Mars 2025', '2 médicaments', false),
+    _PrescData('Ordonnance — Cardiologie', 'Médecin traitant', '10 Jan 2025', '2 médicaments', false),
   ];
 
   const _PrescriptionsTab();

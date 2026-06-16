@@ -670,7 +670,7 @@ class _StepPatient extends StatelessWidget {
         _PatientOption(
           icon: Icons.person_rounded,
           title: 'Pour moi',
-          subtitle: 'Jean Dupont · Né le 15/03/1990 · O+',
+          subtitle: userName,
           selected: forWho == 0,
           onTap: () => onForWho(0),
         ),

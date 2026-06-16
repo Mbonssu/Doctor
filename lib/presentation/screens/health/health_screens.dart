@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════
 
 import 'package:flutter/material.dart';
+import '../../../core/di/app_services.dart';
 import 'dart:math' as math;
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
@@ -141,11 +142,11 @@ class HealthDashboardScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: context.textPrimary)),
                   const SizedBox(height: 14),
                   ...[
-                    _DoctorStatRow(initials: 'AT', name: 'Dr. Amine Toure', specialty: 'Cardiologie',
+                    _DoctorStatRow(initials: '—', name: 'À venir', specialty: 'Médecin le plus consulté',
                         visits: 5, color: AppColors.cardio),
-                    _DoctorStatRow(initials: 'CF', name: 'Dr. Cécile Fon', specialty: 'Ophtalmologie',
+                    _DoctorStatRow(initials: 'CF', name: 'À venir', specialty: 'Médecin fréquent',
                         visits: 3, color: AppColors.ophtalmo),
-                    _DoctorStatRow(initials: 'NB', name: 'Dr. Nathalie Bello', specialty: 'Pédiatrie',
+                    _DoctorStatRow(initials: '—', name: 'À venir', specialty: 'Dernier médecin consulté',
                         visits: 2, color: AppColors.pediatrie),
                   ].map((w) => Padding(padding: const EdgeInsets.only(bottom: 10), child: w)),
                 ]),
@@ -282,7 +283,7 @@ class FamilyScreen extends StatefulWidget {
 class _FamilyScreenState extends State<FamilyScreen> {
   final _members = [
     _FamilyMember('Sarah Dupont', 'Épouse', '32 ans', 'A+', AppColors.gyneco, 'SD', '3 RDV cette année'),
-    _FamilyMember('Lucas Dupont', 'Fils', '8 ans', 'O+', AppColors.pediatrie, 'LD', '5 RDV cette année'),
+    // TODO: charger depuis UsersRepository.getFamilyMembers() quand l'API est prête
     _FamilyMember('Marie Dupont', 'Mère', '62 ans', 'B+', AppColors.danger, 'MD', '7 RDV cette année'),
   ];
 
@@ -325,9 +326,12 @@ class _FamilyScreenState extends State<FamilyScreen> {
                         child: const Center(child: Text('JD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)))),
                     const SizedBox(width: 14),
                     const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Jean Dupont', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16)),
-                      SizedBox(height: 2),
-                      Text('Titulaire du compte · 35 ans · O+', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      Builder(builder: (ctx) {
+                        final u = AppServices.authSessionManager.user;
+                        return Text(u?.fullName ?? 'Patient', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16));
+                      }),
+                      const SizedBox(height: 2),
+                      const Text('Titulaire du compte', style: TextStyle(color: Colors.white70, fontSize: 12)),
                     ])),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -592,18 +596,23 @@ class QRCardScreen extends StatelessWidget {
                         child: CustomPaint(painter: _BigQRPainter()),
                       ),
                       const SizedBox(height: 20),
-                      Text('Jean Dupont',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: context.textPrimary)),
+                      Builder(builder: (ctx) {
+                        final u = AppServices.authSessionManager.user;
+                        return Text(u?.fullName ?? 'Patient',
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: context.textPrimary));
+                      }),
                       const SizedBox(height: 6),
-                      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        _CardBadge(label: 'O+', color: AppColors.danger),
-                        const SizedBox(width: 8),
-                        _CardBadge(label: 'Allergie: Pénicilline', color: AppColors.warning),
-                      ]),
+                      Builder(builder: (ctx) {
+                        final u = AppServices.authSessionManager.user;
+                        return _CardBadge(label: 'ID: ${u?.id ?? '—'}', color: AppColors.primary);
+                      }),
                       const SizedBox(height: 14),
-                      Text('ID: DTP-2025-00147',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                              color: context.textMuted, letterSpacing: 1.5)),
+                      Builder(builder: (ctx) {
+                        final u = AppServices.authSessionManager.user;
+                        return Text('DTP-${u?.id ?? '0'.padLeft(7,'0')}',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                                color: context.textMuted, letterSpacing: 1.5));
+                      }),
                     ]),
                   ),
                   const SizedBox(height: 28),

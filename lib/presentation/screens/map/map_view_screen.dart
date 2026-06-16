@@ -14,9 +14,9 @@ class _MapViewScreenState extends State<MapViewScreen> {
 
   final _locations = [
     _Location('Hôpital Central', 'Hôpital', 'Avenue de la République', 4.8, 245, AppColors.danger),
-    _Location('Dr. Amine Toure', 'Cardiologue', 'Cabinet Médical Central', 4.9, 128, AppColors.cardio),
+    _Location('Médecin disponible', 'Cardiologue', 'Cabinet Médical Central', 4.9, 128, AppColors.cardio),
     _Location('Clinique du Soleil', 'Clinique', 'Rue des Palmiers', 4.7, 189, AppColors.accent),
-    _Location('Dr. Nathalie Bello', 'Pédiatre', 'Centre Médical Enfants', 4.8, 96, AppColors.pediatrie),
+    _Location('Médecin disponible', 'Pédiatre', 'Centre Médical Enfants', 4.8, 96, AppColors.pediatrie),
     _Location('Pharmacie de la Paix', 'Pharmacie', 'Boulevard de la Liberté', 4.6, 78, AppColors.success),
   ];
 

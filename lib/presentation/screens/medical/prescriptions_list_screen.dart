@@ -11,7 +11,7 @@ class PrescriptionsListScreen extends StatelessWidget {
     final prescriptions = [
       _Prescription(
         'Ordonnance #2025-001',
-        'Dr. Amine Toure',
+        'Médecin traitant',
         'Cardiologie',
         '15 Jan 2025',
         3,
@@ -20,7 +20,7 @@ class PrescriptionsListScreen extends StatelessWidget {
       ),
       _Prescription(
         'Ordonnance #2024-089',
-        'Dr. Nathalie Bello',
+        'Médecin consulté',
         'Pédiatrie',
         '28 Déc 2024',
         2,
@@ -29,7 +29,7 @@ class PrescriptionsListScreen extends StatelessWidget {
       ),
       _Prescription(
         'Ordonnance #2024-076',
-        'Dr. Paul Mbarga',
+        'Médecin consulté',
         'Neurologie',
         '10 Nov 2024',
         4,

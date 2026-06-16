@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/di/app_services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 
@@ -181,15 +182,16 @@ class InvoiceScreen extends StatelessWidget {
                   width: 1,
                 ),
               ),
-              child: const Column(
-                children: [
-                  _InfoRow(label: 'Nom', value: 'Jean Dupont'),
-                  SizedBox(height: 10),
-                  _InfoRow(label: 'Email', value: 'jean.dupont@email.com'),
-                  SizedBox(height: 10),
-                  _InfoRow(label: 'Téléphone', value: '+237 6XX XXX XXX'),
-                ],
-              ),
+              child: Builder(builder: (context) {
+                final user = AppServices.authSessionManager.user;
+                return Column(children: [
+                  _InfoRow(label: 'Nom', value: user?.fullName ?? '—'),
+                  const SizedBox(height: 10),
+                  _InfoRow(label: 'Email', value: user?.email ?? '—'),
+                  const SizedBox(height: 10),
+                  _InfoRow(label: 'Téléphone', value: user?.phone ?? '+237 —'),
+                ]);
+              }),
             ),
 
             const SizedBox(height: 24),

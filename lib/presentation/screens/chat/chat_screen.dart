@@ -10,7 +10,7 @@ class ChatScreen extends StatefulWidget {
 
   const ChatScreen({
     super.key,
-    this.doctorName = 'Dr. Amine Toure',
+    this.doctorName = 'Dr. Médecin',
     this.specialty = 'Cardiologie',
     this.initials = 'AT',
     this.color = AppColors.cardio,

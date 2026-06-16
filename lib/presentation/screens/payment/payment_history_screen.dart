@@ -1,19 +1,65 @@
 import 'package:flutter/material.dart';
+import '../../../core/di/app_services.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../data/models/appointment/appointment_model.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/color_extensions.dart';
 import 'invoice_screen.dart';
 
-class PaymentHistoryScreen extends StatelessWidget {
+class PaymentHistoryScreen extends StatefulWidget {
   const PaymentHistoryScreen({super.key});
 
   @override
+  State<PaymentHistoryScreen> createState() => _PaymentHistoryScreenState();
+}
+
+class _PaymentHistoryScreenState extends State<PaymentHistoryScreen> {
+  List<AppointmentModel> _completed = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _isLoading = true; _error = null; });
+    try {
+      final resp = await AppServices.appointmentsRepository
+          .getMyAppointments(status: 'completed', pageSize: 20);
+      if (!mounted) return;
+      setState(() { _completed = resp.appointments; _isLoading = false; });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() { _error = e.displayMessage; _isLoading = false; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _error = 'Erreur de connexion'; _isLoading = false; });
+    }
+  }
+
+  String _fmtDate(DateTime dt) {
+    const m = ['','Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+    return '${dt.day.toString().padLeft(2,'0')} ${m[dt.month]} ${dt.year}';
+  }
+
+  String _fmtPrice(double fee) {
+    final raw = fee.round().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      buf.write(raw[i]);
+      final r = raw.length - i - 1;
+      if (r > 0 && r % 3 == 0) buf.write(' ');
+    }
+    return '${buf.toString()} FCFA';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final payments = [
-      _Payment('15 000 FCFA', 'Consultation Cardiologie', 'Dr. Amine Toure', '15 Jan 2025', 'success', 'INV-2025-001'),
-      _Payment('12 000 FCFA', 'Consultation Pédiatrie', 'Dr. Nathalie Bello', '28 Déc 2024', 'success', 'INV-2024-089'),
-      _Payment('18 000 FCFA', 'Consultation Neurologie', 'Dr. Paul Mbarga', '10 Nov 2024', 'success', 'INV-2024-076'),
-      _Payment('15 000 FCFA', 'Consultation Cardiologie', 'Dr. Amine Toure', '05 Oct 2024', 'success', 'INV-2024-062'),
-    ];
+    // UNUSED — kept for structure only
+    final payments = <_Payment>[];
 
     final totalPaid = payments.fold<int>(
       0,
