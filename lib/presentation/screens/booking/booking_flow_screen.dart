@@ -656,6 +656,10 @@ class _StepPatient extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // final _isDark = context.isDark;
+
+    final user = AppServices.authSessionManager.user;
+    //final String userName = user?.name ?? 'Patient';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -670,7 +674,7 @@ class _StepPatient extends StatelessWidget {
         _PatientOption(
           icon: Icons.person_rounded,
           title: 'Pour moi',
-          subtitle: userName,
+          subtitle: user != null ? '${user.firstName} ${user.lastName}' : 'Vous-même',
           selected: forWho == 0,
           onTap: () => onForWho(0),
         ),

@@ -13,6 +13,8 @@ import '../../data/repositories/doctor_repository.dart';
 import '../../data/repositories/doctors_repository.dart';
 import '../../data/repositories/reviews_repository.dart';
 import '../../data/repositories/users_repository.dart';
+import '../../data/services/account_security_service.dart'; 
+
 
 class AppServices {
   AppServices._();
@@ -36,6 +38,8 @@ class AppServices {
   static late final DoctorsRepository doctorsRepository;
   static late final AppointmentsRepository appointmentsRepository;
   static late final ReviewsRepository reviewsRepository;
+
+  static late final AccountSecurityService accountSecurityService;
 
   static Future<void> initialize() async {
     if (_initialized) {
@@ -69,6 +73,13 @@ class AppServices {
       apiService: appointmentsApiService,
     );
     reviewsRepository = ReviewsRepository(apiService: reviewsApiService);
+
+    accountSecurityService = AccountSecurityService(
+      authRepository: authRepository,
+      usersRepository: usersRepository,
+      sessionManager: authSessionManager,
+      apiClient: apiClient,
+    );
 
     _initialized = true;
   }

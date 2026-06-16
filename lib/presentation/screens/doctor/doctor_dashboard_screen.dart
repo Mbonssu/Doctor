@@ -623,7 +623,7 @@ class _AppointmentCard extends StatelessWidget {
     };
     final name    = appointment.patient?.fullName ?? 'Patient';
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
-    final time    = '\${appointment.appointmentDate.hour.toString().padLeft(2,'0')}h\${appointment.appointmentDate.minute.toString().padLeft(2,'0')}';
+    final time    = '${appointment.appointmentDate.hour.toString().padLeft(2,'0')}h${appointment.appointmentDate.minute.toString().padLeft(2,'0')}';
 
     return Container(
       decoration: BoxDecoration(

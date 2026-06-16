@@ -325,7 +325,7 @@ class _FamilyScreenState extends State<FamilyScreen> {
                         decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14)),
                         child: const Center(child: Text('JD', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 18)))),
                     const SizedBox(width: 14),
-                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Builder(builder: (ctx) {
                         final u = AppServices.authSessionManager.user;
                         return Text(u?.fullName ?? 'Patient', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16));

@@ -245,6 +245,575 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 }
 
+class _HistoryAndSuggestions extends StatelessWidget {
+  final List<String> history;
+  final List<String> specialties;
+  final void Function(String) onTap;
+  final VoidCallback onClearHistory;
+
+  const _HistoryAndSuggestions({
+    required this.history,
+    required this.specialties,
+    required this.onTap,
+    required this.onClearHistory,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Historique
+          if (history.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Recherches récentes',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: onClearHistory,
+                  child: Text(
+                    'Effacer',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 10,
+              children: history.map((item) {
+                return GestureDetector(
+                  onTap: () => onTap(item),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: context.surfaceColor,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: context.borderColor,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.history_rounded,
+                          size: 14,
+                          color: context.textMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          item,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Suggestions par spécialité
+          Text(
+            'Suggestions par spécialité',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: context.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 10,
+            children: specialties.map((spec) {
+              return GestureDetector(
+                onTap: () => onTap(spec),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withValues(alpha: 0.1),
+                        AppColors.accent.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.medical_services_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        spec,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FiltersSheet extends StatefulWidget {
+  final String? specialty;
+  final bool availableToday;
+  final double maxPrice;
+  final String gender;
+  final String location;
+  final List<String> specialties;
+  final String sortBy;
+  final void Function(String?, bool, double, String, String, String) onApply;
+
+  const _FiltersSheet({
+    required this.specialty,
+    required this.availableToday,
+    required this.maxPrice,
+    required this.gender,
+    required this.location,
+    required this.specialties,
+    required this.sortBy,
+    required this.onApply,
+  });
+
+  @override
+  State<_FiltersSheet> createState() => _FiltersSheetState();
+}
+
+class _FiltersSheetState extends State<_FiltersSheet> {
+  late String? _selectedSpecialty;
+  late bool _availableToday;
+  late double _maxPrice;
+  late String _gender;
+  late String _location;
+  late String _sortBy;
+
+  final _genders = ['Tous', 'Homme', 'Femme'];
+  final _locations = ['Toutes les villes', 'Yaoundé', 'Douala', 'Garoua', 'Bafoussam', 'Bamenda'];
+  final _sortOptions = ['Pertinence', 'Note', 'Expérience', 'Prix croissant', 'Prix décroissant'];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSpecialty = widget.specialty;
+    _availableToday = widget.availableToday;
+    _maxPrice = widget.maxPrice;
+    _gender = widget.gender;
+    _location = widget.location;
+    _sortBy = widget.sortBy;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: BoxDecoration(
+        color: context.bgColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.borderColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Filtres',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: context.textPrimary,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedSpecialty = null;
+                      _availableToday = false;
+                      _maxPrice = 30000;
+                      _gender = 'Tous';
+                      _location = 'Toutes les villes';
+                      _sortBy = 'Pertinence';
+                    });
+                  },
+                  child: Text(
+                    'Tout réinitialiser',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Contenu scrollable
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Spécialité
+                  _FilterSection(
+                    title: 'Spécialité',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 10,
+                      children: widget.specialties.map((spec) {
+                        final isSelected = _selectedSpecialty == spec;
+                        return GestureDetector(
+                          onTap: () => setState(() {
+                            _selectedSpecialty = isSelected ? null : spec;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : context.surfaceColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : context.borderColor,
+                                width: isSelected ? 0 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              spec,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : context.textPrimary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Disponibilité
+                  _FilterSection(
+                    title: 'Disponibilité',
+                    child: Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => setState(
+                            () => _availableToday = !_availableToday,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _availableToday
+                                  ? AppColors.primary
+                                  : context.surfaceColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: _availableToday
+                                    ? AppColors.primary
+                                    : context.borderColor,
+                                width: _availableToday ? 0 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.today_rounded,
+                                  size: 18,
+                                  color: _availableToday
+                                      ? Colors.white
+                                      : context.textMuted,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Disponible aujourd\'hui',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: _availableToday
+                                        ? Colors.white
+                                        : context.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Prix max
+                  _FilterSection(
+                    title: 'Prix maximum : ${_maxPrice.toInt()} FCFA',
+                    child: Slider(
+                      value: _maxPrice,
+                      min: 5000,
+                      max: 30000,
+                      divisions: 10,
+                      activeColor: AppColors.primary,
+                      label: '${_maxPrice.toInt()} FCFA',
+                      onChanged: (v) => setState(() => _maxPrice = v),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Genre
+                  _FilterSection(
+                    title: 'Genre du médecin',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 10,
+                      children: _genders.map((g) {
+                        final isSelected = _gender == g;
+                        return GestureDetector(
+                          onTap: () => setState(() => _gender = g),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : context.surfaceColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : context.borderColor,
+                                width: isSelected ? 0 : 1,
+                              ),
+                            ),
+                            child: Text(
+                              g,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : context.textPrimary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Localisation
+                  _FilterSection(
+                    title: 'Localisation',
+                    child: DropdownButtonFormField<String>(
+                      value: _location,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: context.surfaceColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 4,
+                        ),
+                      ),
+                      items: _locations.map((loc) {
+                        return DropdownMenuItem(
+                          value: loc,
+                          child: Text(loc),
+                        );
+                      }).toList(),
+                      onChanged: (v) => setState(() => _location = v!),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Trier par
+                  _FilterSection(
+                    title: 'Trier par',
+                    child: DropdownButtonFormField<String>(
+                      value: _sortBy,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        filled: true,
+                        fillColor: context.surfaceColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 4,
+                        ),
+                      ),
+                      items: _sortOptions.map((opt) {
+                        return DropdownMenuItem(
+                          value: opt,
+                          child: Text(opt),
+                        );
+                      }).toList(),
+                      onChanged: (v) => setState(() => _sortBy = v!),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // Bouton Appliquer
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            decoration: BoxDecoration(
+              color: context.surfaceColor,
+              border: Border(
+                top: BorderSide(color: context.borderColor, width: 1),
+              ),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () {
+                  widget.onApply(
+                    _selectedSpecialty,
+                    _availableToday,
+                    _maxPrice,
+                    _gender,
+                    _location,
+                    _sortBy,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                child: const Text(
+                  'Appliquer les filtres',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterSection extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _FilterSection({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: context.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 10),
+        child,
+      ],
+    );
+  }
+}
+
 // ── Widgets internes ───────────────────────────────────────────
 
 class _ActiveFilter extends StatelessWidget {
@@ -344,7 +913,7 @@ class _DoctorResultCard extends StatelessWidget {
     if (s.contains('neuro')) return AppColors.neuro;
     if (s.contains('pédia') || s.contains('pedia')) return AppColors.pediatrie;
     if (s.contains('opht')) return AppColors.ophtalmo;
-    if (s.contains('derm')) return AppColors.derma;
+    if (s.contains('derm')) return AppColors.dermato;
     if (s.contains('gyn')) return AppColors.gyneco;
     if (s.contains('ortho')) return AppColors.ortho;
     return AppColors.primary;
@@ -452,4 +1021,6 @@ class _DoctorResultCard extends StatelessWidget {
       ),
     );
   }
+
+  
 }

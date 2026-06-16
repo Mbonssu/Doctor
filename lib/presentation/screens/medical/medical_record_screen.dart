@@ -169,7 +169,12 @@ class _SummaryTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: () async { setState(() {}); },
+      onRefresh: () async { 
+        
+        //setState(() {});
+        return Future.value();
+    
+      },
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
         children: [

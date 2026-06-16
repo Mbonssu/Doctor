@@ -13,6 +13,7 @@
 /// - Mise à jour de l'état local
 
 import 'package:flutter/foundation.dart';
+import 'package:mobile/core/network/api_client.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../core/providers/auth_session_manager.dart';
@@ -24,7 +25,7 @@ class AccountSecurityService extends ChangeNotifier {
   AccountSecurityService({
     required AuthRepository authRepository,
     required UsersRepository usersRepository,
-    required AuthSessionManager sessionManager,
+    required AuthSessionManager sessionManager, required ApiClient apiClient,
   }) : _authRepository = authRepository,
        _usersRepository = usersRepository,
        _sessionManager = sessionManager;

@@ -20,7 +20,7 @@ class ApiConfig {
     _currentEnvironment = environment;
   }
 
-  static const String _developmentBaseUrl = 'http://localhost:8000';
+  static const String _developmentBaseUrl = 'http://192.168.56.54:8000';
   static const String _stagingBaseUrl = 'https://staging-api.doctoping.com';
   static const String _productionBaseUrl = 'https://api.doctoping.com';
   
