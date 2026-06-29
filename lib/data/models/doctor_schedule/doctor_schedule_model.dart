@@ -21,7 +21,8 @@ class DoctorScheduleModel {
 
   factory DoctorScheduleModel.fromJson(Map<String, dynamic> json) {
     return DoctorScheduleModel(
-      id: parseInt(json['id']),
+      // id: parseInt(json['id']),
+      id: parseInt(json['id'] ?? 0),
       doctorId: parseInt(json['doctor_id']),
       dayOfWeek: parseInt(json['day_of_week']),
       isWorkingDay: parseBool(json['is_working_day']),
